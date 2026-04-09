@@ -1,0 +1,2918 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>案件管理 統合システム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600;700&family=Noto+Sans+JP:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ===== DESIGN TOKENS ===== */
+:root {
+  --ink: #1a1a2e; --ink-light: #2d2d4e;
+  --paper: #f5f0e8; --paper-warm: #ede7d9; --paper-dark: #d9d0c0;
+  --accent: #8b1a1a; --accent-light: #b52a2a;
+  --accent-gold: #c8963c; --accent-teal: #1a5c6e;
+  --text-muted: #6b6b80; --shadow: rgba(26,26,46,0.15); --border: rgba(26,26,46,0.12);
+  --green: #2e7d4f; --gold: #b8960c;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Noto Sans JP', sans-serif; background: var(--paper); color: var(--ink); min-height: 100vh;
+  background-image: radial-gradient(ellipse at 0% 0%, rgba(139,26,26,0.04) 0%, transparent 50%), radial-gradient(ellipse at 100% 100%, rgba(26,92,110,0.05) 0%, transparent 50%); }
+
+/* ===== HEADER ===== */
+header { background: var(--ink); padding: 0 2rem; display: flex; align-items: center;
+  justify-content: space-between; height: 64px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 20px rgba(0,0,0,0.3); }
+.logo { font-family: 'Noto Serif JP', serif; font-size: 1.1rem; font-weight: 600; color: var(--paper); letter-spacing: 0.1em; display: flex; align-items: center; gap: 10px; }
+.logo-mark { width: 32px; height: 32px; border: 2px solid var(--accent-gold); display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: var(--accent-gold); font-weight: 700; flex-shrink: 0; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.drive-badge { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 3px; font-size: 0.75rem; font-weight: 500; border: 1px solid; font-family: 'Noto Sans JP', sans-serif; cursor: default; }
+.drive-badge.connected { background: rgba(46,125,79,0.15); color: #4caf7d; border-color: rgba(76,175,125,0.3); }
+.drive-badge.disconnected { background: rgba(255,255,255,0.06); color: rgba(245,240,232,0.45); border-color: rgba(255,255,255,0.1); cursor: pointer; transition: all 0.2s; }
+.drive-badge.disconnected:hover { background: rgba(255,255,255,0.1); color: rgba(245,240,232,0.7); }
+.dot { width: 7px; height: 7px; border-radius: 50%; }
+.dot.green { background: #4caf7d; }
+.dot.gray { background: rgba(245,240,232,0.3); }
+.btn { padding: 7px 18px; border: none; border-radius: 3px; font-family: 'Noto Sans JP', sans-serif; font-size: 0.82rem; cursor: pointer; transition: all 0.2s; font-weight: 500; letter-spacing: 0.03em; }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-light); }
+.btn-secondary { background: transparent; color: var(--paper-warm); border: 1px solid rgba(245,240,232,0.25); }
+.btn-secondary:hover { background: rgba(245,240,232,0.08); }
+.btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); padding: 6px 14px; font-size: 0.78rem; }
+.btn-ghost:hover { background: var(--paper-warm); color: var(--ink); }
+.btn-danger { background: transparent; color: var(--accent); border: 1px solid rgba(139,26,26,0.3); padding: 5px 12px; font-size: 0.76rem; }
+.btn-danger:hover { background: var(--accent); color: #fff; }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { background: #245f3d; }
+.btn-sm { padding: 4px 10px; font-size: 0.74rem; }
+
+/* ===== LAYOUT ===== */
+.main { display: flex; height: calc(100vh - 64px); }
+
+/* ===== SIDEBAR ===== */
+.sidebar { width: 260px; min-width: 260px; background: var(--ink-light); display: flex; flex-direction: column; overflow: hidden; }
+.sidebar-header { padding: 16px 16px 12px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.sidebar-title { font-family: 'Noto Serif JP', serif; font-size: 0.72rem; color: rgba(245,240,232,0.4); letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 10px; }
+.search-box { position: relative; }
+.search-box input { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 3px; padding: 7px 10px 7px 30px; color: var(--paper); font-family: 'Noto Sans JP', sans-serif; font-size: 0.8rem; outline: none; }
+.search-box input::placeholder { color: rgba(245,240,232,0.3); }
+.search-box input:focus { border-color: rgba(200,150,60,0.5); }
+.search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 0.85rem; color: rgba(245,240,232,0.35); }
+.sidebar-filter { display: flex; gap: 0; border-bottom: 1px solid rgba(255,255,255,0.07); }
+.sf-btn { flex: 1; padding: 7px 4px; background: none; border: none; color: rgba(245,240,232,0.4); font-size: 0.72rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; border-bottom: 2px solid transparent; letter-spacing: 0.04em; }
+.sf-btn:hover { color: rgba(245,240,232,0.7); }
+.sf-btn.active { color: var(--accent-gold); border-bottom-color: var(--accent-gold); }
+.case-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+.case-list::-webkit-scrollbar { width: 4px; }
+.case-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.case-item { padding: 10px 16px; cursor: pointer; border-left: 3px solid transparent; transition: all 0.15s; position: relative; }
+.case-item:hover { background: rgba(255,255,255,0.05); }
+.case-item.active { background: rgba(200,150,60,0.12); border-left-color: var(--accent-gold); }
+.case-item.closed { opacity: 0.45; }
+.case-item.closed.active { opacity: 0.7; }
+.case-item-name { font-size: 0.82rem; color: var(--paper-warm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 40px; }
+.case-item-meta { font-size: 0.7rem; color: rgba(245,240,232,0.4); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.case-item-badge { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: var(--accent); color: #fff; font-size: 0.62rem; padding: 1px 5px; border-radius: 2px; font-family: 'JetBrains Mono', monospace; }
+.case-item-badge.urgent { background: #c75000; }
+.case-item-badge.closed-badge { background: #5a5a6e; }
+.sidebar-footer { padding: 12px 16px; border-top: 1px solid rgba(255,255,255,0.07); display: flex; flex-direction: column; gap: 6px; }
+
+/* ===== CONTENT ===== */
+.content { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.content::-webkit-scrollbar { width: 6px; }
+.content::-webkit-scrollbar-thumb { background: var(--paper-dark); border-radius: 3px; }
+
+/* ===== TABS ===== */
+.tabs { display: flex; background: var(--paper-warm); border-bottom: 2px solid var(--paper-dark); padding: 0 24px; }
+.tab { padding: 14px 20px; font-size: 0.83rem; cursor: pointer; color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; font-weight: 500; white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+/* ===== CASE DETAIL (tasks/info tabs) ===== */
+.case-detail { padding: 28px 32px; flex: 1; }
+.case-detail-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.case-number { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.1em; margin-bottom: 6px; }
+.case-title-text { font-family: 'Noto Serif JP', serif; font-size: 1.5rem; font-weight: 600; color: var(--ink); line-height: 1.4; }
+.case-title-text.is-closed { opacity: 0.55; text-decoration: line-through; }
+.case-detail-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; margin-left: 16px; }
+.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.info-card { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 16px 20px; box-shadow: 0 1px 4px var(--shadow); }
+.info-card.full { grid-column: 1 / -1; }
+.info-label { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.1em; margin-bottom: 6px; font-weight: 500; }
+.info-value { font-size: 0.95rem; color: var(--ink); font-weight: 500; line-height: 1.5; }
+.info-value.date { font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; color: var(--accent-teal); }
+.deadline-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 3px; font-size: 0.78rem; font-weight: 600; margin-top: 6px; }
+.deadline-badge.overdue { background: rgba(139,26,26,0.1); color: var(--accent); border: 1px solid rgba(139,26,26,0.2); }
+.deadline-badge.soon { background: rgba(199,80,0,0.1); color: #c75000; border: 1px solid rgba(199,80,0,0.2); }
+.deadline-badge.normal { background: rgba(26,92,110,0.08); color: var(--accent-teal); border: 1px solid rgba(26,92,110,0.15); }
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 16px; padding: 40px; }
+.empty-state-icon { font-size: 3rem; opacity: 0.3; }
+.empty-state-title { font-family: 'Noto Serif JP', serif; font-size: 1.1rem; color: var(--ink-light); opacity: 0.5; }
+.empty-state-sub { font-size: 0.82rem; opacity: 0.7; text-align: center; line-height: 1.8; }
+.no-cases-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 40px; color: var(--text-muted); gap: 12px; text-align: center; }
+
+/* ===== TASK STYLES ===== */
+.tasks-section { margin-top: 0; }
+.tasks-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.tasks-section-title { font-size: 0.7rem; color: var(--text-muted); letter-spacing: 0.1em; font-weight: 500; }
+.task-cards { display: flex; flex-direction: column; gap: 12px; }
+.task-card { background: #fff; border: 1px solid var(--border); border-radius: 4px; padding: 16px 18px; box-shadow: 0 1px 4px var(--shadow); display: flex; gap: 14px; align-items: flex-start; transition: opacity 0.2s; }
+.task-card.done { opacity: 0.5; }
+.task-card.done .task-card-content { text-decoration: line-through; color: var(--text-muted); }
+.task-card-check { margin-top: 2px; flex-shrink: 0; }
+.task-card-check input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent-teal); }
+.task-card-body { flex: 1; min-width: 0; }
+.task-card-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; flex-wrap: wrap; }
+.task-card-deadline { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; }
+.task-card-deadline.overdue { color: var(--accent); }
+.task-card-deadline.soon { color: #c75000; }
+.task-card-deadline.normal { color: var(--accent-teal); }
+.task-card-deadline.none { color: var(--text-muted); }
+.task-card-content { font-size: 0.88rem; line-height: 1.7; white-space: pre-wrap; color: var(--ink); }
+.task-card-actions { display: flex; gap: 6px; flex-shrink: 0; margin-top: 2px; }
+.task-empty { background: #fff; border: 1px dashed var(--paper-dark); border-radius: 4px; padding: 24px; text-align: center; font-size: 0.83rem; color: var(--text-muted); }
+.task-editor-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 10px; }
+.task-editor-item { background: #fff; border: 1px solid var(--paper-dark); border-radius: 4px; padding: 14px 16px; position: relative; }
+.task-editor-item-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.task-editor-num { font-size: 0.72rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.08em; }
+.task-editor-deadline-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.task-editor-deadline-row label { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+.add-task-btn { display: flex; align-items: center; gap: 6px; padding: 8px 14px; background: rgba(26,92,110,0.07); border: 1px dashed rgba(26,92,110,0.3); border-radius: 3px; color: var(--accent-teal); font-size: 0.8rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; width: 100%; justify-content: center; transition: all 0.15s; }
+.add-task-btn:hover { background: rgba(26,92,110,0.12); }
+
+/* ===== LIST VIEW ===== */
+.list-view { padding: 24px 32px; }
+.list-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+.list-controls-title { font-family: 'Noto Serif JP', serif; font-size: 1rem; font-weight: 600; margin-right: 8px; }
+.sort-btn { padding: 6px 14px; border: 1px solid var(--border); background: #fff; border-radius: 3px; font-size: 0.78rem; cursor: pointer; font-family: 'Noto Sans JP', sans-serif; color: var(--text-muted); transition: all 0.15s; }
+.sort-btn.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.list-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; background: #fff; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; box-shadow: 0 1px 8px var(--shadow); }
+.list-table th { background: var(--ink); color: rgba(245,240,232,0.85); padding: 11px 14px; text-align: left; font-size: 0.73rem; letter-spacing: 0.08em; font-weight: 500; }
+.list-table td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; line-height: 1.5; }
+.list-table tr:last-child td { border-bottom: none; }
+.list-table tr:hover td { background: rgba(245,240,232,0.5); }
+.list-table tbody tr { cursor: pointer; }
+.list-table tr.row-closed td { opacity: 0.45; }
+.table-case-name { font-weight: 600; color: var(--ink); }
+.table-parties { color: var(--text-muted); font-size: 0.8rem; }
+.table-date { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: var(--accent-teal); }
+.table-deadline { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; }
+.table-deadline.overdue { color: var(--accent); font-weight: 600; }
+.table-deadline.soon { color: #c75000; font-weight: 600; }
+.table-deadline.normal { color: var(--text-muted); }
+.task-list-view { padding: 24px 32px; }
+.task-list-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; background: #fff; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; box-shadow: 0 1px 8px var(--shadow); }
+.task-list-table th { background: var(--ink); color: rgba(245,240,232,0.85); padding: 11px 14px; text-align: left; font-size: 0.73rem; letter-spacing: 0.08em; font-weight: 500; }
+.task-list-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; line-height: 1.5; }
+.task-list-table tr:last-child td { border-bottom: none; }
+.task-list-table tr:hover td { background: rgba(245,240,232,0.5); cursor: pointer; }
+.task-list-table tr.tl-done td { opacity: 0.4; text-decoration: line-through; }
+.tl-deadline-cell { font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+.tl-deadline-cell.overdue { color: var(--accent); }
+.tl-deadline-cell.soon { color: #c75000; }
+.tl-deadline-cell.normal { color: var(--accent-teal); }
+.tl-deadline-cell.none { color: var(--text-muted); font-weight: 400; }
+.tl-badge { display: inline-block; padding: 1px 6px; border-radius: 2px; font-size: 0.68rem; margin-left: 5px; font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+.tl-badge.overdue { background: rgba(139,26,26,0.12); color: var(--accent); }
+.tl-badge.soon { background: rgba(199,80,0,0.1); color: #c75000; }
+.tl-content { font-size: 0.85rem; color: var(--ink); }
+.tl-casename { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+.tl-check { accent-color: var(--accent-teal); width: 15px; height: 15px; cursor: pointer; }
+.tl-filter-row { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.tl-section-header { background: var(--paper-warm); color: var(--text-muted); font-size: 0.72rem; letter-spacing: 0.1em; font-weight: 600; padding: 7px 14px; border-top: 1px solid var(--paper-dark); }
+
+/* ===== CLOSED ===== */
+.closed-banner { display: flex; align-items: center; gap: 10px; background: rgba(90,90,110,0.12); border: 1px solid rgba(90,90,110,0.25); border-radius: 4px; padding: 10px 16px; margin-bottom: 20px; font-size: 0.83rem; color: #5a5a6e; }
+.closed-banner strong { color: var(--ink-light); }
+.closed-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; padding: 7px 14px; border: 1px solid rgba(90,90,110,0.3); border-radius: 3px; font-size: 0.78rem; color: #5a5a6e; background: transparent; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; }
+.closed-toggle:hover { background: rgba(90,90,110,0.1); }
+.case-closed-check { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid rgba(90,90,110,0.35); border-radius: 3px; font-size: 0.8rem; color: #5a5a6e; cursor: pointer; background: transparent; font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; }
+.case-closed-check:hover { background: rgba(90,90,110,0.1); }
+.case-closed-check.is-closed { background: #5a5a6e; color: #fff; border-color: #5a5a6e; }
+
+/* ===== CLIENT EDITOR ===== */
+.client-editor-item { display: flex; gap: 8px; align-items: center; }
+.client-kana-input { width: 44px !important; text-align: center; }
+
+/* ===== MODALS ===== */
+.modal-overlay { position: fixed; inset: 0; background: rgba(10,10,20,0.65); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(2px); animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal { background: var(--paper); border-radius: 6px; width: 100%; max-width: 680px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.4); animation: slideUp 0.25s ease; }
+.modal.narrow { max-width: 480px; }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.modal-header { background: var(--ink); padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; border-radius: 6px 6px 0 0; position: sticky; top: 0; z-index: 1; }
+.modal-title { font-family: 'Noto Serif JP', serif; color: var(--paper); font-size: 1rem; font-weight: 600; letter-spacing: 0.05em; }
+.modal-close { background: none; border: none; color: rgba(245,240,232,0.5); font-size: 1.3rem; cursor: pointer; padding: 0 4px; transition: color 0.15s; }
+.modal-close:hover { color: var(--paper); }
+.modal-body { padding: 24px; }
+.form-group { margin-bottom: 18px; }
+.form-label { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 7px; font-weight: 500; }
+.form-label span.req { color: var(--accent); font-size: 0.7rem; }
+.form-input, .form-textarea { width: 100%; background: #fff; border: 1px solid var(--paper-dark); border-radius: 3px; padding: 9px 12px; font-family: 'Noto Sans JP', sans-serif; font-size: 0.88rem; color: var(--ink); outline: none; transition: border-color 0.2s; }
+.form-input:focus, .form-textarea:focus { border-color: var(--accent-teal); box-shadow: 0 0 0 3px rgba(26,92,110,0.08); }
+.form-textarea { resize: vertical; min-height: 80px; line-height: 1.6; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.datetime-row { display: grid; grid-template-columns: 1.8fr 1fr 1fr; gap: 10px; }
+.help-text { font-size: 0.72rem; color: var(--text-muted); margin-top: 5px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; background: var(--paper-warm); border-radius: 0 0 6px 6px; position: sticky; bottom: 0; }
+
+/* ===== NOTIFICATION ===== */
+.notification { position: fixed; bottom: 24px; right: 24px; background: var(--ink); color: var(--paper); padding: 12px 20px; border-radius: 4px; font-size: 0.83rem; box-shadow: 0 8px 24px rgba(0,0,0,0.3); z-index: 2000; animation: slideIn 0.25s ease; display: flex; align-items: center; gap: 8px; max-width: 320px; }
+@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.notification.success { border-left: 3px solid #4caf7d; }
+.notification.error { border-left: 3px solid var(--accent); }
+.notification.info { border-left: 3px solid var(--accent-teal); }
+
+/* ===== DRIVE MODAL ===== */
+.drive-setup-box { background: rgba(26,92,110,0.06); border: 1px solid rgba(26,92,110,0.15); border-radius: 4px; padding: 16px 20px; margin-bottom: 20px; }
+.drive-setup-box p { font-size: 0.82rem; line-height: 1.8; color: var(--ink); }
+.drive-setup-box ol { margin: 10px 0 0 18px; font-size: 0.82rem; line-height: 2; color: var(--ink-light); }
+.account-info { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(46,125,79,0.08); border: 1px solid rgba(76,175,125,0.25); border-radius: 4px; margin-bottom: 16px; }
+.account-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--accent-teal); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1rem; font-weight: 600; flex-shrink: 0; overflow: hidden; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-name { font-size: 0.85rem; font-weight: 600; color: var(--ink); }
+.account-email { font-size: 0.75rem; color: var(--text-muted); }
+.sync-status { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+.spinner { width: 14px; height: 14px; border: 2px solid rgba(26,92,110,0.2); border-top-color: var(--accent-teal); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.section-divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+.warning-box { background: rgba(139,26,26,0.06); border: 1px solid rgba(139,26,26,0.15); border-radius: 4px; padding: 12px 16px; font-size: 0.78rem; color: var(--accent); line-height: 1.6; margin-bottom: 16px; }
+
+/* ===== TIME PICKER (task manager style) ===== */
+.time-picker-wrap-task { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tp-unit { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.tp-btn { width: 56px; height: 28px; border: 1px solid var(--paper-dark); background: var(--paper-warm); border-radius: 3px; cursor: pointer; font-size: 0.7rem; color: var(--text-muted); font-family: 'Noto Sans JP', sans-serif; transition: all 0.15s; display: flex; align-items: center; justify-content: center; user-select: none; }
+.tp-btn:hover { background: var(--paper-dark); }
+.tp-input { width: 56px; height: 34px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; border: 1px solid var(--paper-dark); border-radius: 3px; color: var(--ink); background: #fff; outline: none; }
+.tp-input:focus { border-color: var(--accent-teal); box-shadow: 0 0 0 2px rgba(26,92,110,0.1); }
+.tp-input.empty { color: var(--text-muted); font-size: 0.75rem; }
+.tp-sep { font-size: 1.2rem; font-weight: 600; color: var(--text-muted); align-self: center; margin: 0 2px; }
+.tp-label { font-size: 0.65rem; color: var(--text-muted); text-align: center; margin-top: 2px; }
+
+/* ===== REPORTS TAB - 3 COLUMN LAYOUT ===== */
+.reports-layout {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 左：報告書履歴リスト */
+.reports-history {
+  width: 220px;
+  min-width: 220px;
+  background: white;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.reports-history-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--paper-warm);
+}
+.reports-history-title {
+  font-family: 'Noto Serif JP', serif;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
+}
+.reports-history-list {
+  flex: 1;
+  overflow-y: auto;
+}
+.reports-history-list::-webkit-scrollbar { width: 4px; }
+.reports-history-list::-webkit-scrollbar-thumb { background: var(--paper-dark); border-radius: 2px; }
+.report-history-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(212,201,184,0.5);
+  transition: background 0.15s;
+  border-left: 3px solid transparent;
+}
+.report-history-item:hover { background: rgba(139,26,26,0.04); }
+.report-history-item.active { background: rgba(139,26,26,0.07); border-left-color: var(--accent); }
+.report-history-date { font-size: 0.7rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.report-history-period { font-size: 0.78rem; color: var(--ink); margin-top: 2px; font-weight: 500; }
+.report-history-meta { font-size: 0.68rem; color: var(--text-muted); margin-top: 2px; }
+.report-history-actions { display: flex; gap: 4px; margin-top: 6px; }
+.report-history-btn { background: none; border: none; color: #ccc; font-size: 13px; cursor: pointer; padding: 1px 3px; line-height: 1; transition: color 0.15s; }
+.report-history-btn:hover { color: var(--accent); }
+.rh-empty { padding: 20px 14px; font-size: 0.78rem; color: var(--text-muted); text-align: center; line-height: 1.8; }
+
+/* 中央：入力フォーム */
+.reports-form {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--paper);
+}
+.reports-form::-webkit-scrollbar { width: 5px; }
+.reports-form::-webkit-scrollbar-thumb { background: var(--paper-dark); border-radius: 3px; }
+.reports-form-inner {
+  padding: 20px 24px;
+}
+
+/* 右：プレビュー */
+.reports-preview {
+  width: 380px;
+  min-width: 380px;
+  border-left: 1px solid var(--border);
+  background: #f0ede6;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.reports-preview::-webkit-scrollbar { width: 4px; }
+.reports-preview::-webkit-scrollbar-thumb { background: var(--paper-dark); border-radius: 2px; }
+.preview-header {
+  background: var(--gold);
+  color: white;
+  padding: 10px 16px;
+  font-family: 'Noto Serif JP', serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.preview-body { padding: 12px; flex: 1; }
+.preview-doc {
+  background: white;
+  border: 1px solid #ddd;
+  padding: 16px 10px 14px 14px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  font-family: 'Noto Serif JP', serif;
+  font-size: 8.5px;
+  line-height: 1.9;
+  color: var(--ink);
+  min-height: 520px;
+}
+.pvt { text-align: center; font-size: 13px; font-weight: 700; letter-spacing: 0.3em; margin-bottom: 4px; }
+.pvd { text-align: right; font-size: 8.5px; margin-bottom: 3px; }
+.pvto { font-size: 9px; text-decoration: underline; margin: 2px 0; }
+.pvf { text-align: right; font-size: 8px; line-height: 2; margin: 5px 0; border-top: 1px solid #ddd; padding-top: 5px; }
+.pvg, .pvi { font-size: 8.5px; margin-bottom: 4px; }
+.pvk { text-align: center; font-size: 8.5px; letter-spacing: 0.3em; margin-bottom: 5px; }
+.pvs { margin-bottom: 5px; }
+.pvst { font-size: 8.5px; font-weight: normal; }
+.pvsb { font-size: 8.5px; white-space: pre-line; line-height: 1.9; }
+.pvc { text-align: right; font-size: 8.5px; margin: 4px 0; }
+.pvsd { font-size: 8.5px; border-top: 1px solid #ddd; padding-top: 5px; margin-top: 4px; }
+.pvsd-t { font-weight: bold; margin-bottom: 2px; font-size: 8.5px; }
+.pvsd-ijo { text-align: right; font-size: 8.5px; }
+.preview-status-bar { background: #f0ede6; border-top: 1px solid var(--border); padding: 8px 14px; font-size: 10.5px; color: var(--text-muted); display: flex; align-items: center; gap: 8px; position: sticky; bottom: 0; }
+.sdot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+.sdot.ok { background: #27ae60; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.sdot.run { background: var(--gold); animation: pulse 1s infinite; }
+
+/* ===== REPORT FORM PANELS ===== */
+.rpanel { background: white; border-radius: 2px; border: 1px solid var(--border); box-shadow: 0 2px 8px var(--shadow); overflow: hidden; margin-bottom: 14px; }
+.rpanel-head { background: var(--ink); color: white; padding: 10px 18px; font-family: 'Noto Serif JP', serif; font-size: 0.72rem; letter-spacing: 0.15em; display: flex; align-items: center; gap: 8px; }
+.rpanel-head .rdot { width: 5px; height: 5px; background: var(--accent); border-radius: 50%; }
+.rpanel-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 11px; }
+.rfg { display: flex; flex-direction: column; gap: 4px; }
+.rfg label { font-size: 10.5px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.06em; }
+.rfg input[type=text], .rfg input[type=date], .rfg textarea, .rfg select {
+  width: 100%; padding: 7px 10px; border: 1px solid var(--paper-dark); border-radius: 2px;
+  font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: var(--ink);
+  background: var(--paper); outline: none; transition: border-color 0.2s;
+}
+.rfg input:focus, .rfg textarea:focus, .rfg select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,26,26,0.07); background: white; }
+.rfg textarea { resize: vertical; min-height: 60px; line-height: 1.7; }
+.rsl { font-family: 'Noto Serif JP', serif; font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.15em; padding-bottom: 4px; border-bottom: 1px solid rgba(139,26,26,0.15); }
+.rr2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rdivider { height: 1px; background: var(--border); margin: 2px 0; }
+.radd-btn { background: none; border: 1px dashed var(--border); border-radius: 2px; padding: 7px; width: 100%; color: var(--text-muted); font-size: 12px; cursor: pointer; text-align: center; transition: all 0.2s; }
+.radd-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* client row in report form */
+.rclient-row { display: flex; align-items: center; gap: 7px; padding: 7px 9px; background: var(--paper); border: 1px solid var(--border); border-radius: 2px; }
+.rclient-row input[type=text] { flex: 1; padding: 5px 8px; font-size: 13px; background: white; border: 1px solid var(--paper-dark); border-radius: 2px; width: auto; }
+.rclient-row select { width: 76px; padding: 5px; font-size: 13px; flex-shrink: 0; border: 1px solid var(--paper-dark); border-radius: 2px; }
+.rdoc-row { display: flex; align-items: center; gap: 7px; padding: 7px 9px; background: var(--paper); border: 1px solid var(--border); border-radius: 2px; }
+.rdoc-row input.dname { flex: 1; padding: 5px 8px; font-size: 13px; background: white; border: 1px solid var(--paper-dark); border-radius: 2px; width: auto; }
+.rdoc-row input.dcnt { width: 54px; padding: 5px 6px; font-size: 12px; background: white; text-align: center; border: 1px solid var(--paper-dark); border-radius: 2px; flex-shrink: 0; }
+.rother-row { display: flex; align-items: center; gap: 7px; padding: 7px 9px; background: var(--paper); border: 1px solid var(--border); border-radius: 2px; }
+.rother-row input { flex: 1; padding: 5px 8px; font-size: 13px; background: white; border: 1px solid var(--paper-dark); border-radius: 2px; width: auto; }
+.rsend-row { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: var(--paper); border: 1px solid var(--border); border-radius: 2px; }
+.rsend-row.rmanual-row { border-style: dashed; }
+.rsend-row input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+.rsend-row .sname { flex: 1; font-size: 12.5px; }
+.rsend-row input.sname-input { flex: 1; padding: 4px 7px; font-size: 12.5px; background: white; border: 1px solid var(--paper-dark); border-radius: 2px; width: auto; }
+.rsend-row input.scnt { width: 54px; padding: 4px 6px; font-size: 12px; background: white; border: 1px solid var(--paper-dark); border-radius: 2px; text-align: center; flex-shrink: 0; }
+.rsend-row select.skind { width: 58px; padding: 4px; font-size: 11.5px; background: white; border: 1px solid var(--paper-dark); border-radius: 2px; flex-shrink: 0; color: var(--ink); }
+.rsend-hint { font-size: 10.5px; color: var(--text-muted); background: rgba(184,150,12,0.07); border: 1px solid rgba(184,150,12,0.2); border-radius: 2px; padding: 7px 10px; line-height: 1.6; }
+.rrm { background: none; border: none; color: #ccc; font-size: 15px; cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0; transition: color 0.15s; }
+.rrm:hover { color: var(--accent); }
+
+/* Report action buttons */
+.report-btn-row { display: flex; gap: 8px; margin-top: 4px; margin-bottom: 4px; }
+.report-btn-save { flex: 0 0 auto; padding: 12px 16px; background: var(--green); color: white; border: none; border-radius: 2px; font-size: 12px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 6px; font-family: 'Noto Sans JP', sans-serif; }
+.report-btn-save:hover { background: #245f3d; }
+.report-btn-gen { flex: 1; padding: 12px; background: var(--accent); color: white; border: none; border-radius: 2px; font-family: 'Noto Serif JP', serif; font-size: 12px; letter-spacing: 0.1em; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.report-btn-gen:hover { background: var(--accent-light); }
+.report-btn-gen:disabled { opacity: 0.6; cursor: not-allowed; }
+.report-saved-banner { background: rgba(46,125,79,0.1); border: 1px solid rgba(46,125,79,0.3); border-radius: 2px; padding: 8px 14px; font-size: 12px; color: var(--green); display: none; align-items: center; gap: 8px; margin-bottom: 12px; }
+.report-saved-banner.show { display: flex; }
+
+/* proc editor */
+.proc-list { display: flex; flex-direction: column; gap: 5px; }
+.proc-row { cursor: default; display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px; background: var(--paper); border: 1px solid var(--border); border-radius: 2px; transition: border-color 0.15s; }
+.proc-row:focus-within { border-color: rgba(139,26,26,0.4); }
+.proc-row.level-0 { background: white; }
+.proc-row.level-1 { margin-left: 18px; background: #fdfaf5; }
+.proc-row.level-2 { margin-left: 36px; background: #faf7f0; }
+.proc-row.dragging { opacity: 0.4; border: 1px dashed var(--accent); }
+.proc-row.drag-over { border-top: 2px solid var(--accent); background: rgba(139,26,26,0.04); }
+.drag-handle { cursor: grab; color: #bbb; font-size: 14px; padding: 6px 2px 0; flex-shrink: 0; user-select: none; line-height: 1; }
+.drag-handle:hover { color: var(--accent); }
+.drag-handle:active { cursor: grabbing; }
+.proc-badge { flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--accent); min-width: 32px; padding-top: 7px; text-align: left; font-family: 'Noto Serif JP', serif; white-space: nowrap; }
+.proc-row.level-1 .proc-badge { color: var(--gold); }
+.proc-row.level-2 .proc-badge { color: var(--text-muted); }
+.proc-row textarea { flex: 1; padding: 5px 8px; font-size: 13px; background: transparent; border: none; outline: none; resize: none; min-height: 34px; line-height: 1.6; font-family: 'Noto Sans JP', sans-serif; color: var(--ink); }
+.proc-row textarea:focus { background: white; border-radius: 2px; }
+.proc-row-btns { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; padding-top: 4px; }
+.proc-row-btns button { background: none; border: none; color: #ccc; font-size: 13px; cursor: pointer; padding: 1px 3px; line-height: 1; transition: color 0.15s; }
+.proc-row-btns button:hover { color: var(--accent); }
+.proc-add-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.proc-add-btns button { flex: 1; min-width: 0; background: none; border: 1px dashed var(--border); border-radius: 2px; padding: 6px 4px; font-size: 11.5px; color: var(--text-muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.proc-add-btns button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* report time picker */
+.rtime-picker-wrap { position: relative; }
+.rtime-display { width: 100%; padding: 7px 10px; border: 1px solid var(--paper-dark); border-radius: 2px; font-family: 'Noto Sans JP', sans-serif; font-size: 13px; color: var(--ink); background: var(--paper); cursor: pointer; display: flex; align-items: center; justify-content: space-between; transition: border-color 0.2s; user-select: none; }
+.rtime-display:hover { border-color: var(--accent); }
+.rtime-display.open { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(139,26,26,0.08); background: white; }
+.rtime-display .td-val { flex: 1; }
+.rtime-display .td-icon { color: var(--text-muted); font-size: 12px; }
+.rtime-popup { position: absolute; top: calc(100% + 4px); left: 0; z-index: 300; background: white; border: 1px solid var(--border); border-radius: 3px; box-shadow: 0 6px 24px rgba(0,0,0,0.14); display: none; flex-direction: column; width: 220px; }
+.rtime-popup.show { display: flex; }
+.rtp-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px 6px; border-bottom: 1px solid var(--border); }
+.rtp-head span { font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.rtp-clear { background: none; border: none; color: var(--text-muted); font-size: 11px; cursor: pointer; padding: 0; }
+.rtp-clear:hover { color: var(--accent); }
+.rtp-cols { display: flex; }
+.rtp-col { flex: 1; display: flex; flex-direction: column; align-items: center; }
+.rtp-col-label { font-size: 10px; color: var(--text-muted); padding: 6px 0 4px; letter-spacing: 0.05em; }
+.rtp-scroll { height: 160px; overflow-y: auto; width: 100%; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.rtp-scroll::-webkit-scrollbar { width: 4px; }
+.rtp-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.rtp-item { padding: 8px 0; text-align: center; font-size: 14px; cursor: pointer; color: var(--text-muted); border-radius: 2px; transition: all 0.1s; line-height: 1; }
+.rtp-item:hover { background: rgba(139,26,26,0.06); color: var(--ink); }
+.rtp-item.selected { background: var(--accent); color: white; font-weight: 600; }
+.rtp-divider { width: 1px; background: var(--border); margin: 0; }
+.rtp-foot { padding: 8px 10px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+.rtp-ok { background: var(--accent); color: white; border: none; border-radius: 2px; padding: 6px 16px; font-size: 12px; cursor: pointer; }
+.rtp-ok:hover { background: var(--accent-light); }
+
+/* ===== IMPORT MODAL (report) ===== */
+.import-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+.import-modal-overlay.show { opacity: 1; pointer-events: auto; }
+.import-modal { background: white; border-radius: 3px; box-shadow: 0 8px 40px rgba(0,0,0,0.3); width: 440px; max-width: 92vw; overflow: hidden; }
+.import-modal-head { background: var(--ink); color: white; padding: 14px 20px; font-family: 'Noto Serif JP', serif; font-size: 13px; letter-spacing: 0.1em; display: flex; align-items: center; justify-content: space-between; }
+.import-modal-head button { background: none; border: none; color: rgba(255,255,255,0.5); font-size: 18px; cursor: pointer; line-height: 1; padding: 0; }
+.import-modal-head button:hover { color: white; }
+.import-modal-body { padding: 20px; }
+.import-modal-body p { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; margin-bottom: 14px; }
+.modal-drop { border: 2px dashed var(--border); border-radius: 3px; padding: 28px 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: var(--paper); }
+.modal-drop:hover, .modal-drop.over { border-color: var(--accent); background: rgba(139,26,26,0.04); }
+.modal-drop p { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+.modal-drop .drop-icon { font-size: 28px; margin-bottom: 8px; }
+.modal-drop input[type=file] { display: none; }
+.import-modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+.import-modal-foot button { padding: 9px 18px; border-radius: 2px; font-size: 13px; cursor: pointer; border: 1px solid var(--border); background: white; color: var(--text-muted); transition: all 0.15s; }
+.import-modal-foot button:hover { border-color: var(--accent); color: var(--accent); }
+.import-modal-foot .btn-import-go { background: var(--accent); color: white; border-color: var(--accent); }
+.import-modal-foot .btn-import-go:hover { background: var(--accent-light); }
+.import-modal-foot .btn-import-go:disabled { opacity: 0.5; cursor: not-allowed; }
+.import-status { font-size: 12px; margin-top: 10px; padding: 8px 12px; border-radius: 2px; display: none; }
+.import-status.ok { display: block; background: rgba(30,125,69,0.1); color: var(--green); border: 1px solid rgba(30,125,69,0.25); }
+.import-status.err { display: block; background: rgba(139,26,26,0.08); color: var(--accent); border: 1px solid rgba(139,26,26,0.2); }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">法</div>
+    案件管理　統合システム
+  </div>
+  <div class="header-actions">
+    <div class="drive-badge disconnected" id="driveStatusBadge" onclick="openDriveModal()">
+      <div class="dot gray" id="driveDot"></div>
+      <span id="driveStatusText">Drive 未接続</span>
+    </div>
+    <button class="btn btn-secondary" onclick="showListView()">📋 一覧</button>
+    <button class="btn btn-secondary" onclick="showTaskListView()">⏰ 期限順</button>
+    <button class="btn btn-secondary" onclick="exportToJSON()">⬇ JSON</button>
+    <label class="btn btn-secondary" style="cursor:pointer;">⬆ 取込 <input type="file" accept=".json" style="display:none" onchange="openMergeImportModal(event)"></label>
+    <button class="btn btn-secondary" onclick="exportToExcel()">📊 Excel</button>
+    <button class="btn btn-primary" onclick="openNewCaseModal()">＋ 新規案件</button>
+  </div>
+</header>
+
+<!-- ===== MAIN ===== -->
+<div class="main">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-title">Cases</div>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" placeholder="案件を検索…" id="sidebarSearch" oninput="renderSidebar()">
+      </div>
+    </div>
+    <div class="sidebar-filter">
+      <button class="sf-btn active" id="sfAll" onclick="setSidebarFilter('all')">すべて</button>
+      <button class="sf-btn" id="sfActive" onclick="setSidebarFilter('active')">進行中</button>
+      <button class="sf-btn" id="sfClosed" onclick="setSidebarFilter('closed')">終了</button>
+    </div>
+    <div class="case-list" id="caseList"></div>
+    <div class="sidebar-footer">
+      <button class="btn btn-primary" style="width:100%;" onclick="openNewCaseModal()">＋ 新規案件</button>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="contentArea">
+    <div class="empty-state">
+      <div class="empty-state-icon">📁</div>
+      <div class="empty-state-title">案件を選択してください</div>
+      <div class="empty-state-sub">左のリストから案件を選択するか、<br>新規案件を作成してください。</div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ===== CASE MODAL ===== -->
+<div class="modal-overlay" id="caseModal" style="display:none;" onclick="if(event.target===this)closeCaseModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">新規案件の作成</div>
+      <button class="modal-close" onclick="closeCaseModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <div class="form-label">依頼者名 <span class="req">必須</span></div>
+        <div id="clientEditorList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+        <button class="add-task-btn" onclick="addClientEditorItem()" style="margin-top:4px;">＋ 依頼者を追加</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">相手方</label>
+        <input class="form-input" id="fi_opponent" type="text" placeholder="相手方の氏名・名称">
+      </div>
+      <div class="form-group">
+        <label class="form-label">事件名 <span class="req">必須</span></label>
+        <input class="form-input" id="fi_caseName" type="text" placeholder="例：交通損害賠償請求事件">
+      </div>
+      <div class="form-group">
+        <label class="form-label">次回期日</label>
+        <div class="datetime-row">
+          <input class="form-input" id="fi_dateDate" type="date">
+          <div class="time-picker-wrap-task">
+            <div class="tp-unit">
+              <button class="tp-btn" id="tpHourUp">▲</button>
+              <input class="tp-input" id="tpHourInput" type="text" placeholder="−−" maxlength="2">
+              <button class="tp-btn" id="tpHourDown">▼</button>
+              <div class="tp-label">時</div>
+            </div>
+            <span class="tp-sep">:</span>
+            <div class="tp-unit">
+              <button class="tp-btn" id="tpMinUp">▲</button>
+              <input class="tp-input" id="tpMinInput" type="text" placeholder="−−" maxlength="2">
+              <button class="tp-btn" id="tpMinDown">▼</button>
+              <div class="tp-label">分</div>
+            </div>
+          </div>
+          <input type="hidden" id="fi_dateHour">
+          <input type="hidden" id="fi_dateMin">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">タスク</label>
+        <div id="taskEditorList" style="display:flex;flex-direction:column;gap:8px;"></div>
+        <button class="add-task-btn" onclick="addTaskEditorItem()" style="margin-top:8px;">＋ タスクを追加</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeCaseModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveCase()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONFIRM DELETE MODAL ===== -->
+<div class="modal-overlay" id="confirmModal" style="display:none;" onclick="if(event.target===this)closeConfirm()">
+  <div class="modal narrow">
+    <div class="modal-header">
+      <div class="modal-title">案件の削除</div>
+      <button class="modal-close" onclick="closeConfirm()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.9rem;line-height:1.8;color:var(--ink);">
+        この案件を削除してもよろしいですか？<br>
+        <strong id="confirmCaseName" style="color:var(--accent);"></strong><br>
+        <span style="color:var(--text-muted);font-size:0.82rem;">この操作は元に戻せません。報告書データも削除されます。</span>
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeConfirm()">キャンセル</button>
+      <button class="btn btn-danger" style="padding:7px 18px;" onclick="confirmDelete()">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DRIVE MODAL ===== -->
+<div class="modal-overlay" id="driveModal" style="display:none;" onclick="if(event.target===this)closeDriveModal()">
+  <div class="modal narrow">
+    <div class="modal-header">
+      <div class="modal-title">🔗 Google Drive 連携設定</div>
+      <button class="modal-close" onclick="closeDriveModal()">✕</button>
+    </div>
+    <div class="modal-body" id="driveModalBody"></div>
+  </div>
+</div>
+
+<!-- ===== MERGE IMPORT MODAL ===== -->
+<div class="modal-overlay" id="mergeImportModal" style="display:none;" onclick="if(event.target===this)closeMergeImportModal()">
+  <div class="modal narrow">
+    <div class="modal-header">
+      <div class="modal-title">📂 データを読み込む</div>
+      <button class="modal-close" onclick="closeMergeImportModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:0.85rem;line-height:1.8;color:var(--ink);" id="mergeImportDesc"></p>
+      <div style="display:flex;gap:8px;flex-direction:column;" id="mergeImportActions"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeMergeImportModal()">キャンセル</button>
+      <button class="btn btn-primary" id="mergeImportBtn" onclick="doMergeImport()">読み込む</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== REPORT IMPORT MODAL ===== -->
+<div class="import-modal-overlay" id="reportImportModal" onclick="closeReportImportModal(event)">
+  <div class="import-modal" onclick="event.stopPropagation()">
+    <div class="import-modal-head">
+      <span>📂 報告書JSONを読み込む</span>
+      <button onclick="closeReportImportModal()">✕</button>
+    </div>
+    <div class="import-modal-body">
+      <p>経過報告書ジェネレーターでエクスポートしたJSONファイルを選択してください。<br>既存のデータに<strong>追加</strong>されます（重複IDは上書き）。</p>
+      <div class="modal-drop" id="reportDropZone" onclick="document.getElementById('reportJsonFileInput').click()"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')"
+        ondrop="handleReportFileDrop(event)">
+        <div class="drop-icon">📄</div>
+        <p>クリックまたはファイルをここにドロップ</p>
+        <p style="font-size:11px;margin-top:4px;color:#aaa;">.json ファイル対応</p>
+        <input type="file" id="reportJsonFileInput" accept=".json,application/json" onchange="handleReportFileSelect(event)"/>
+      </div>
+      <div class="import-status" id="reportImportStatus"></div>
+    </div>
+    <div class="import-modal-foot">
+      <button onclick="closeReportImportModal()">キャンセル</button>
+      <button class="btn-import-go" id="btnReportImportGo" onclick="doReportImport()" disabled>読み込む</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// ─── GLOBAL DATA STORE ───────────────────────────────────────
+// ============================================================
+const STORAGE_KEY = 'case_task_v2';
+const DRIVE_FILE_NAME = 'case_task_manager_data.json';
+const REPORT_ARCHIVE_KEY = 'houritsu_archive'; // legacy key for report app
+
+let cases = [];
+let currentCaseId = null;
+let editingCaseId = null;
+let deletingCaseId = null;
+let currentView = 'detail'; // 'detail' | 'list' | 'tasklist'
+let currentTab = 'tasks';   // 'tasks' | 'reports'
+let listSortMode = 'alpha';
+let sidebarFilter = 'all';
+let taskListFilter = 'active';
+
+// Google Drive state
+let gClientId = localStorage.getItem('gClientId') || '';
+let gAccessToken = null;
+let gDriveFileId = localStorage.getItem('gDriveFileId') || '';
+let gUserInfo = null;
+let isSyncing = false;
+
+// ─── STORAGE HELPERS ─────────────────────────────────────────
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(cases)); }
+function load() {
+  try {
+    let d = localStorage.getItem(STORAGE_KEY);
+    if (d) { cases = JSON.parse(d); return; }
+    d = localStorage.getItem('case_task_v1');
+    if (d) {
+      const old = JSON.parse(d);
+      cases = old.map(c => migrateCaseToMultiTask(c));
+      save();
+    }
+  } catch(e) { cases = []; }
+}
+function migrateCaseToMultiTask(c) {
+  if (!c.tasks) {
+    const tasks = [];
+    if (c.deadline || c.task) {
+      tasks.push({ id: genId(), deadline: c.deadline||'', content: c.task||'', done: false, createdAt: c.createdAt||new Date().toISOString() });
+    }
+    const { deadline, task, ...rest } = c;
+    c = { ...rest, tasks };
+  }
+  if (!c.clients) c = { ...c, clients: [{ kana: c.kana||'', name: c.client||'' }] };
+  if (!c.reports) c = { ...c, reports: [] };
+  return c;
+}
+function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function pad2(n) { return String(n).padStart(2,'0'); }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── CLIENT HELPERS ──────────────────────────────────────────
+function getClients(c) {
+  if (c.clients && c.clients.length) return c.clients;
+  return [{ kana: c.kana||'', name: c.client||'' }];
+}
+function primaryClientName(c) { return (getClients(c)[0]?.name) || '（依頼者未設定）'; }
+function primaryKana(c) { return getClients(c).find(cl => cl.kana)?.kana || ''; }
+function allClientNames(c) { return getClients(c).map(cl => cl.name).filter(Boolean).join('・') || '—'; }
+
+// ─── TASK HELPERS ────────────────────────────────────────────
+function getTasks(c) { return c.tasks || []; }
+function getActiveTasks(c) { return getTasks(c).filter(t => !t.done); }
+function nearestDeadline(c) {
+  const active = getActiveTasks(c).filter(t => t.deadline);
+  if (!active.length) return null;
+  return active.map(t => t.deadline).sort()[0];
+}
+function deadlineStatus(deadline) {
+  if (!deadline) return 'normal';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.floor((new Date(deadline) - today) / 86400000);
+  if (diff < 0) return 'overdue';
+  if (diff <= 7) return 'soon';
+  return 'normal';
+}
+function deadlineBadgeText(deadline) {
+  if (!deadline) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diff = Math.floor((new Date(deadline) - today) / 86400000);
+  if (diff < 0) return Math.abs(diff) + '日超過';
+  if (diff === 0) return '本日期限';
+  if (diff <= 7) return '残' + diff + '日';
+  return null;
+}
+function caseDeadlineStatus(c) { return deadlineStatus(nearestDeadline(c)); }
+function caseDeadlineBadge(c) { return deadlineBadgeText(nearestDeadline(c)); }
+function formatNextDate(c) {
+  if (!c.nextDate) return '—';
+  const h = (c.nextHour !== '' && c.nextHour !== null && c.nextHour !== undefined) ? pad2(c.nextHour) : null;
+  const m = (c.nextMin !== '' && c.nextMin !== null && c.nextMin !== undefined) ? pad2(c.nextMin) : null;
+  if (h !== null && m !== null) return c.nextDate + '　' + h + ':' + m;
+  return c.nextDate;
+}
+
+// ─── SORT HELPERS ────────────────────────────────────────────
+function sortAlpha(arr) {
+  return [...arr].sort((a,b) => {
+    const ka = primaryKana(a), kb = primaryKana(b);
+    if (ka||kb) { if(!ka) return 1; if(!kb) return -1; const r=ka.localeCompare(kb,'ja'); if(r!==0) return r; }
+    return primaryClientName(a).localeCompare(primaryClientName(b),'ja');
+  });
+}
+function sortDeadline(arr) {
+  return [...arr].sort((a,b) => {
+    const da = nearestDeadline(a), db = nearestDeadline(b);
+    if (!da && !db) return 0; if (!da) return 1; if (!db) return -1;
+    return new Date(da) - new Date(db);
+  });
+}
+function sortNextDate(arr) {
+  return [...arr].sort((a,b) => {
+    if (!a.nextDate && !b.nextDate) return 0; if (!a.nextDate) return 1; if (!b.nextDate) return -1;
+    const da = new Date(a.nextDate + (a.nextHour!=null&&a.nextHour!=='' ? 'T'+String(a.nextHour).padStart(2,'0')+':'+String(a.nextMin||0).padStart(2,'0') : ''));
+    const db = new Date(b.nextDate + (b.nextHour!=null&&b.nextHour!=='' ? 'T'+String(b.nextHour).padStart(2,'0')+':'+String(b.nextMin||0).padStart(2,'0') : ''));
+    return da - db;
+  });
+}
+
+// ─── REPORT HELPERS ──────────────────────────────────────────
+function getReports(c) { return c.reports || []; }
+
+// ─── DRIVE STATUS UI ─────────────────────────────────────────
+function updateDriveStatusUI() {
+  const badge = document.getElementById('driveStatusBadge');
+  const dot = document.getElementById('driveDot');
+  const text = document.getElementById('driveStatusText');
+  if (gAccessToken && gUserInfo) {
+    badge.className = 'drive-badge connected'; badge.style.cursor = 'pointer';
+    dot.className = 'dot green'; text.textContent = 'Drive 接続中';
+  } else {
+    badge.className = 'drive-badge disconnected';
+    dot.className = 'dot gray'; text.textContent = 'Drive 未接続';
+  }
+}
+
+// ─── DRIVE MODAL ─────────────────────────────────────────────
+function openDriveModal() { renderDriveModalBody(); document.getElementById('driveModal').style.display = 'flex'; }
+function closeDriveModal() { document.getElementById('driveModal').style.display = 'none'; }
+function renderDriveModalBody() {
+  const body = document.getElementById('driveModalBody');
+  if (gAccessToken && gUserInfo) {
+    const initial = (gUserInfo.name||'?')[0].toUpperCase();
+    body.innerHTML = `
+      <div class="account-info">
+        <div class="account-avatar">${gUserInfo.picture ? `<img src="${esc(gUserInfo.picture)}" onerror="this.parentElement.textContent='${initial}'">` : initial}</div>
+        <div><div class="account-name">${esc(gUserInfo.name||'')}</div><div class="account-email">${esc(gUserInfo.email||'')}</div></div>
+      </div>
+      <p style="font-size:0.83rem;line-height:1.7;color:var(--text-muted);margin-bottom:16px;">
+        Google Drive に接続されています。データは <strong style="color:var(--ink);">${esc(DRIVE_FILE_NAME)}</strong> に保存・同期されます。
+      </p>
+      <div id="syncStatusArea" style="margin-bottom:20px;"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-green" onclick="syncToDrive(true)" style="flex:1;">☁ 今すぐ同期</button>
+        <button class="btn btn-ghost" onclick="loadFromDrive()" style="flex:1;">⬇ Driveから読み込む</button>
+      </div>
+      <hr class="section-divider">
+      <button class="btn btn-danger" style="width:100%;padding:8px;" onclick="disconnectDrive()">ログアウト（Drive連携を解除）</button>`;
+  } else {
+    const savedId = gClientId;
+    body.innerHTML = `
+      <div class="drive-setup-box">
+        <p>Google Driveにデータを保存するには、<strong>クライアントID</strong>が必要です。</p>
+        <ol>
+          <li>Google Cloud Console でプロジェクトを作成</li>
+          <li>Google Drive API を有効化</li>
+          <li>OAuth クライアントID を取得</li>
+          <li>下の欄にIDを貼り付けてログイン</li>
+        </ol>
+      </div>
+      <div class="form-group">
+        <label class="form-label">クライアントID <span class="req">必須</span></label>
+        <input class="form-input" id="gClientIdInput" type="text" placeholder="○○○.apps.googleusercontent.com" value="${esc(savedId)}" style="font-family:'JetBrains Mono',monospace;font-size:0.78rem;">
+      </div>
+      ${savedId ? '' : `<div class="warning-box">⚠ クライアントIDを入力してから「Googleでログイン」ボタンを押してください。</div>`}
+      <button class="btn btn-green" style="width:100%;padding:10px;font-size:0.88rem;" onclick="startGoogleLogin()">🔑 Googleでログイン</button>`;
+  }
+}
+
+// ─── GOOGLE LOGIN ─────────────────────────────────────────────
+function startGoogleLogin() {
+  const inputEl = document.getElementById('gClientIdInput');
+  const id = (inputEl ? inputEl.value.trim() : gClientId);
+  if (!id) { showNotif('クライアントIDを入力してください。', 'error'); return; }
+  if (!id.includes('.apps.googleusercontent.com')) { showNotif('クライアントIDの形式が正しくありません。', 'error'); return; }
+  gClientId = id; localStorage.setItem('gClientId', id);
+  try {
+    const client = google.accounts.oauth2.initTokenClient({
+      client_id: gClientId,
+      scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+      callback: async (tokenResponse) => {
+        if (tokenResponse.error) { showNotif('ログインに失敗しました: ' + tokenResponse.error, 'error'); return; }
+        gAccessToken = tokenResponse.access_token;
+        try {
+          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + gAccessToken } });
+          gUserInfo = await res.json();
+        } catch(e) { gUserInfo = { name: 'ユーザー', email: '' }; }
+        updateDriveStatusUI(); renderDriveModalBody();
+        showNotif('Googleアカウントに接続しました。', 'success');
+        await syncToDrive(false); await loadFromDrive();
+      }
+    });
+    client.requestAccessToken();
+  } catch(e) { showNotif('Google認証ライブラリの読み込みに失敗しました。', 'error'); }
+}
+function disconnectDrive() {
+  gAccessToken = null; gUserInfo = null; gDriveFileId = '';
+  localStorage.removeItem('gDriveFileId');
+  updateDriveStatusUI(); renderDriveModalBody();
+  showNotif('Driveの連携を解除しました。', 'info');
+}
+
+// ─── DRIVE SYNC ───────────────────────────────────────────────
+function showSyncStatus(state) {
+  const area = document.getElementById('syncStatusArea');
+  if (!area) return;
+  if (state === 'saving') area.innerHTML = `<div class="sync-status"><div class="spinner"></div> 同期中...</div>`;
+  else if (state === 'done') area.innerHTML = `<div class="sync-status">✓ 同期完了 — ${new Date().toLocaleTimeString('ja-JP')}</div>`;
+  else area.innerHTML = '';
+}
+async function syncToDrive(showMsg = true) {
+  if (!gAccessToken) { if(showMsg) showNotif('先にGoogleでログインしてください。', 'error'); return; }
+  if (isSyncing) return;
+  isSyncing = true; showSyncStatus('saving');
+  try {
+    const content = JSON.stringify({ cases, savedAt: new Date().toISOString() });
+
+    // 既存ファイルIDがあれば直接上書き
+    if (gDriveFileId) {
+      const res = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${gDriveFileId}?uploadType=media`,
+        { method: 'PATCH', headers: { Authorization: 'Bearer ' + gAccessToken, 'Content-Type': 'application/json' }, body: content }
+      );
+      // 404の場合はファイルIDが無効→新規作成へ
+      if (res.status === 404) { gDriveFileId = ''; localStorage.removeItem('gDriveFileId'); }
+      else if (!res.ok) {
+        const err = await res.json().catch(()=>({}));
+        throw new Error((err.error?.message)||`HTTP ${res.status}`);
+      }
+    }
+
+    // ファイルIDがない（初回 or 404後）
+    if (!gDriveFileId) {
+      // 同名ファイルを検索
+      const searchRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}'+and+trashed=false&fields=files(id,name)`,
+        { headers: { Authorization: 'Bearer ' + gAccessToken } }
+      );
+      if (!searchRes.ok) {
+        const err = await searchRes.json().catch(()=>({}));
+        throw new Error((err.error?.message)||`検索失敗 HTTP ${searchRes.status}`);
+      }
+      const searchData = await searchRes.json();
+
+      if (searchData.files && searchData.files.length > 0) {
+        // 既存ファイルに上書き
+        gDriveFileId = searchData.files[0].id;
+        localStorage.setItem('gDriveFileId', gDriveFileId);
+        const res2 = await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${gDriveFileId}?uploadType=media`,
+          { method: 'PATCH', headers: { Authorization: 'Bearer ' + gAccessToken, 'Content-Type': 'application/json' }, body: content }
+        );
+        if (!res2.ok) {
+          const err = await res2.json().catch(()=>({}));
+          throw new Error((err.error?.message)||`上書き失敗 HTTP ${res2.status}`);
+        }
+      } else {
+        // 新規作成
+        const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
+        form.append('file', new Blob([content], { type: 'application/json' }));
+        const createRes = await fetch(
+          'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+          { method: 'POST', headers: { Authorization: 'Bearer ' + gAccessToken }, body: form }
+        );
+        if (!createRes.ok) {
+          const err = await createRes.json().catch(()=>({}));
+          throw new Error((err.error?.message)||`新規作成失敗 HTTP ${createRes.status}`);
+        }
+        const createData = await createRes.json();
+        gDriveFileId = createData.id;
+        localStorage.setItem('gDriveFileId', gDriveFileId);
+      }
+    }
+
+    showSyncStatus('done');
+    if (showMsg) showNotif('Google Driveに同期しました。', 'success');
+
+  } catch(e) {
+    console.error('syncToDrive error:', e);
+    showNotif('同期に失敗しました：' + e.message, 'error');
+    showSyncStatus('');
+  } finally {
+    isSyncing = false;
+  }
+}
+
+async function loadFromDrive() {
+  if (!gAccessToken) { showNotif('先にGoogleでログインしてください。', 'error'); return; }
+  showNotif('Driveからデータを読み込み中…', 'info');
+  try {
+    const searchRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}'+and+trashed=false&fields=files(id,name)`,
+      { headers: { Authorization: 'Bearer ' + gAccessToken } }
+    );
+    if (!searchRes.ok) {
+      const err = await searchRes.json().catch(()=>({}));
+      throw new Error((err.error?.message)||`検索失敗 HTTP ${searchRes.status}`);
+    }
+    const searchData = await searchRes.json();
+
+    if (!searchData.files || !searchData.files.length) {
+      showNotif('Driveにデータファイルが見つかりませんでした。まず「今すぐ同期」で保存してください。', 'error');
+      return;
+    }
+
+    const fileId = searchData.files[0].id;
+    gDriveFileId = fileId;
+    localStorage.setItem('gDriveFileId', fileId);
+
+    const fileRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: 'Bearer ' + gAccessToken } }
+    );
+    if (!fileRes.ok) {
+      const err = await fileRes.json().catch(()=>({}));
+      throw new Error((err.error?.message)||`読み込み失敗 HTTP ${fileRes.status}`);
+    }
+
+    const data = await fileRes.json();
+    if (data.cases) {
+      cases = data.cases.map(c => migrateCaseToMultiTask(c));
+      save(); renderSidebar(); renderContent();
+      showNotif(`Driveから ${cases.length} 件の案件を読み込みました。`, 'success');
+    } else {
+      showNotif('Driveのファイルに有効なデータが見つかりませんでした。', 'error');
+    }
+  } catch(e) {
+    console.error('loadFromDrive error:', e);
+    showNotif('読み込みに失敗しました：' + e.message, 'error');
+  }
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────
+function setSidebarFilter(f) {
+  sidebarFilter = f;
+  ['sfAll','sfActive','sfClosed'].forEach(id => document.getElementById(id).classList.remove('active'));
+  document.getElementById(f==='all'?'sfAll':f==='active'?'sfActive':'sfClosed').classList.add('active');
+  renderSidebar();
+}
+function renderSidebar() {
+  const q = (document.getElementById('sidebarSearch').value||'').toLowerCase();
+  let list = cases.filter(c => {
+    if (sidebarFilter === 'active' && c.closed) return false;
+    if (sidebarFilter === 'closed' && !c.closed) return false;
+    if (!q) return true;
+    return (c.caseName||'').toLowerCase().includes(q) || allClientNames(c).toLowerCase().includes(q) || (c.opponent||'').toLowerCase().includes(q);
+  });
+  list = sortAlpha(list);
+  const el = document.getElementById('caseList');
+  if (!list.length) {
+    el.innerHTML = `<div style="padding:20px 16px;font-size:0.78rem;color:rgba(245,240,232,0.35);text-align:center;">${q?'該当する案件がありません':'案件がありません'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const isClosed = !!c.closed;
+    const activeCnt = getActiveTasks(c).length;
+    const badge = caseDeadlineBadge(c);
+    const status = caseDeadlineStatus(c);
+    const kana = primaryKana(c);
+    const clientDisplay = allClientNames(c);
+    const reportCnt = getReports(c).length;
+    return `<div class="case-item${c.id===currentCaseId?' active':''}${isClosed?' closed':''}" onclick="selectCase('${c.id}')">
+      <div class="case-item-name">${kana?`<span style="font-size:0.7rem;background:rgba(200,150,60,0.2);color:var(--accent-gold);padding:1px 5px;border-radius:2px;margin-right:5px;font-family:serif">${esc(kana)}</span>`:''} ${esc(clientDisplay)} — ${esc(c.caseName||'（事件名未設定）')}</div>
+      <div class="case-item-meta">${c.opponent ? '相手方: '+esc(c.opponent) : '&nbsp;'}${!isClosed && activeCnt>0?` ／ タスク ${activeCnt}件`:''}${reportCnt>0?` ／ 報告書 ${reportCnt}件`:''}</div>
+      ${isClosed ? `<div class="case-item-badge closed-badge">終了</div>` : (badge ? `<div class="case-item-badge ${status==='overdue'?'urgent':''}">${badge}</div>` : '')}
+    </div>`;
+  }).join('');
+}
+
+function selectCase(id) {
+  currentCaseId = id;
+  currentView = 'detail';
+  if (currentTab !== 'tasks' && currentTab !== 'reports') currentTab = 'tasks';
+  renderSidebar();
+  renderContent();
+}
+
+// ─── CONTENT ─────────────────────────────────────────────────
+function renderContent() {
+  if (currentView === 'list') { renderListView(); return; }
+  if (currentView === 'tasklist') { renderTaskListView(); return; }
+  const area = document.getElementById('contentArea');
+  if (!currentCaseId) {
+    area.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-title">案件を選択してください</div><div class="empty-state-sub">左のリストから案件を選択するか、<br>新規案件を作成してください。</div></div>`;
+    return;
+  }
+  const c = cases.find(x=>x.id===currentCaseId);
+  if (!c) { currentCaseId=null; renderContent(); return; }
+
+  if (currentTab === 'reports') {
+    renderReportsTab(c);
+  } else {
+    renderTasksTab(c);
+  }
+}
+
+// ─── TASKS TAB ───────────────────────────────────────────────
+function renderTasksTab(c) {
+  const area = document.getElementById('contentArea');
+  const tasks = getTasks(c);
+  const nd = nearestDeadline(c);
+  const status = deadlineStatus(nd);
+  const badge = deadlineBadgeText(nd);
+  const statusLabel = {overdue:'期限超過',soon:'期限間近',normal:''}[status];
+  const activeCnt = getActiveTasks(c).length;
+  const doneCnt = tasks.filter(t=>t.done).length;
+  const reportCnt = getReports(c).length;
+
+  area.innerHTML = `
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab('tasks')">📄 案件詳細</div>
+      <div class="tab" onclick="switchTab('reports')">📋 経過報告書 ${reportCnt>0?`<span style="font-size:0.68rem;background:var(--accent);color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px;">${reportCnt}</span>`:''}</div>
+    </div>
+    <div class="case-detail">
+      <div class="case-detail-header">
+        <div class="case-title-area">
+          <div class="case-number">CASE / ${esc(c.id.toUpperCase())}</div>
+          <div class="case-title-text${c.closed?' is-closed':''}">${esc(c.caseName||'（事件名未設定）')}</div>
+        </div>
+        <div class="case-detail-actions">
+          ${c.closed ? `<button class="case-closed-check is-closed" onclick="toggleCaseClosed('${c.id}')">✓ 終了済み</button>` : `<button class="case-closed-check" onclick="toggleCaseClosed('${c.id}')">□ 終了にする</button>`}
+          <button class="btn btn-ghost" onclick="openEditModal('${c.id}')">✏️ 編集</button>
+          <button class="btn btn-danger" onclick="openConfirmDelete('${c.id}')">🗑 削除</button>
+        </div>
+      </div>
+      ${c.closed ? `<div class="closed-banner">🔒 <strong>この案件は終了済みです。</strong>　「終了済み」ボタンをクリックすると進行中に戻せます。</div>` : ''}
+      <div class="info-grid">
+        <div class="info-card"><div class="info-label">① 依頼者名</div><div class="info-value">
+          ${getClients(c).map(cl => `<div>${cl.kana?`<span style="font-size:0.78rem;background:rgba(200,150,60,0.15);color:var(--accent-gold);padding:2px 7px;border-radius:2px;margin-right:6px;font-family:'Noto Serif JP',serif;font-weight:600">${esc(cl.kana)}</span>`:''}<span>${esc(cl.name||'—')}</span></div>`).join('')}
+        </div></div>
+        <div class="info-card"><div class="info-label">② 相手方名</div><div class="info-value">${esc(c.opponent||'—')}</div></div>
+        <div class="info-card"><div class="info-label">④ 次回期日</div><div class="info-value date">${esc(formatNextDate(c))}</div></div>
+        <div class="info-card">
+          <div class="info-label">⑤ 直近タスク期限</div>
+          <div class="info-value" style="font-family:'JetBrains Mono',monospace;font-size:0.88rem;color:var(--accent);">${nd || '—'}</div>
+          ${badge ? `<div class="deadline-badge ${status}">${statusLabel} — ${badge}</div>` : ''}
+        </div>
+      </div>
+      <div class="tasks-section">
+        <div class="tasks-section-header">
+          <div class="tasks-section-title">⑤ タスク一覧 （未完了 ${activeCnt} 件 ／ 完了 ${doneCnt} 件）</div>
+          <button class="btn btn-ghost btn-sm" onclick="openAddTaskModal('${c.id}')">＋ タスクを追加</button>
+        </div>
+        <div class="task-cards" id="taskCards_${c.id}">
+          ${tasks.length === 0
+            ? `<div class="task-empty">タスクがありません。「＋ タスクを追加」から追加してください。</div>`
+            : tasks.map(t => renderTaskCard(t, c.id)).join('')
+          }
+        </div>
+      </div>
+    </div>`;
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  renderContent();
+}
+
+// ─── TASK CARD ───────────────────────────────────────────────
+function renderTaskCard(t, caseId) {
+  const st = deadlineStatus(t.deadline);
+  const badge = deadlineBadgeText(t.deadline);
+  const stLabel = {overdue:'期限超過',soon:'期限間近',normal:''}[st]||'';
+  const dlClass = t.deadline ? st : 'none';
+  const dlText = t.deadline || '期限なし';
+  return `<div class="task-card${t.done?' done':''}" id="tc_${t.id}">
+    <div class="task-card-check">
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleTaskDone('${caseId}','${t.id}',this.checked)">
+    </div>
+    <div class="task-card-body">
+      <div class="task-card-meta">
+        <span class="task-card-deadline ${dlClass}">${esc(dlText)}</span>
+        ${badge && !t.done ? `<span class="deadline-badge ${st}" style="margin-top:0;padding:2px 8px;font-size:0.72rem;">${stLabel} — ${badge}</span>` : ''}
+      </div>
+      <div class="task-card-content">${esc(t.content||'（内容なし）')}</div>
+    </div>
+    <div class="task-card-actions">
+      <button class="btn btn-ghost btn-sm" onclick="openEditTaskModal('${caseId}','${t.id}')">編集</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteTask('${caseId}','${t.id}')">削除</button>
+    </div>
+  </div>`;
+}
+
+// ─── TASK ACTIONS ────────────────────────────────────────────
+function toggleTaskDone(caseId, taskId, done) {
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const t = getTasks(c).find(x=>x.id===taskId); if(!t) return;
+  t.done = done;
+  save(); renderSidebar(); renderContent();
+  if (gAccessToken) syncToDrive(false);
+}
+function deleteTask(caseId, taskId) {
+  if (!confirm('このタスクを削除しますか？')) return;
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  c.tasks = getTasks(c).filter(x=>x.id!==taskId);
+  save(); renderSidebar(); renderContent();
+  showNotif('タスクを削除しました。','success');
+  if (gAccessToken) syncToDrive(false);
+}
+function toggleCaseClosed(caseId) {
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  c.closed = !c.closed;
+  c.updatedAt = new Date().toISOString();
+  save(); renderSidebar(); renderContent();
+  showNotif(c.closed ? '案件を「終了」にしました。' : '案件を「進行中」に戻しました。', 'success');
+  if (gAccessToken) syncToDrive(false);
+}
+
+// ─── REPORTS TAB ─────────────────────────────────────────────
+let currentReportId = null; // currently editing report id (null = new)
+
+function renderReportsTab(c) {
+  const area = document.getElementById('contentArea');
+  const reports = getReports(c);
+  const reportCnt = reports.length;
+
+  area.innerHTML = `
+    <div class="tabs">
+      <div class="tab" onclick="switchTab('tasks')">📄 案件詳細</div>
+      <div class="tab active" onclick="switchTab('reports')">📋 経過報告書 ${reportCnt>0?`<span style="font-size:0.68rem;background:var(--accent);color:#fff;padding:1px 6px;border-radius:10px;margin-left:4px;">${reportCnt}</span>`:''}</div>
+    </div>
+    <div class="reports-layout">
+      <!-- 左：履歴 -->
+      <div class="reports-history">
+        <div class="reports-history-header">
+          <div class="reports-history-title">保管済み報告書</div>
+          <button class="btn btn-primary btn-sm" style="width:100%;margin-top:4px;" onclick="startNewReport('${c.id}')">＋ 新規作成</button>
+        </div>
+        <div class="reports-history-list" id="reportsHistoryList">
+          ${renderReportsHistoryList(reports, c.id)}
+        </div>
+      </div>
+      <!-- 中央：フォーム -->
+      <div class="reports-form" id="reportsFormArea">
+        <div class="reports-form-inner" id="reportsFormInner">
+          ${renderReportForm(c)}
+        </div>
+      </div>
+      <!-- 右：プレビュー -->
+      <div class="reports-preview">
+        <div class="preview-header"><span>👁</span> プレビュー</div>
+        <div class="preview-body">
+          <div class="preview-doc" id="rPreviewDoc">
+            <div class="pvt">経過報告書</div>
+            <div class="pvd" id="rpv-date"></div>
+            <div style="height:3px;"></div>
+            <div id="rpv-to-block"></div>
+            <div class="pvf" id="rpv-from"></div>
+            <div class="pvg">拝啓　時下ますますご清栄のこととお慶び申し上げます。</div>
+            <div class="pvi" id="rpv-intro"></div>
+            <div class="pvk">記</div>
+            <div class="pvs"><div class="pvst">１　提出書類</div><div class="pvsb" id="rpv-docs"></div></div>
+            <div class="pvs"><div class="pvst">２　手続の概要</div><div class="pvsb" id="rpv-proc"></div></div>
+            <div class="pvs"><div class="pvst">３　次回期日</div><div class="pvsb" id="rpv-next"></div></div>
+            <div class="pvs"><div class="pvst">４　当方の準備事項</div><div class="pvsb" id="rpv-prep"></div></div>
+            <div class="pvi" style="margin-top:4px;">以上、ご報告となります。引き続きよろしくお願い申し上げます。</div>
+            <div class="pvc">敬具</div>
+            <div class="pvsd"><div class="pvsd-t">（送付書類）</div><div id="rpv-sdocs"></div></div>
+          </div>
+        </div>
+        <div class="preview-status-bar"><div class="sdot ok" id="rSdot"></div><span id="rStxt">入力内容がリアルタイムで反映されます</span></div>
+      </div>
+    </div>`;
+
+  // Init report form state
+  currentReportId = null;
+  rOurId = 0; rManId = 0; rTheirId = 0; rProcId = 0;
+  initReportForm(c);
+}
+
+function renderReportsHistoryList(reports, caseId) {
+  if (!reports.length) return `<div class="rh-empty">保管された報告書はありません。<br>「新規作成」から作成できます。</div>`;
+  return [...reports].reverse().map(r => {
+    const dateStr = r.docDate || '';
+    const periodStr = r.periodNum || '（期日番号未入力）';
+    const savedAt = r.savedAt ? new Date(r.savedAt).toLocaleDateString('ja-JP') : '';
+    return `<div class="report-history-item${r.id===currentReportId?' active':''}" data-rid="${r.id}" onclick="loadReportFromHistory('${caseId}','${r.id}')">
+      <div class="report-history-date">${esc(dateStr)} 作成</div>
+      <div class="report-history-period">${esc(periodStr)}</div>
+      <div class="report-history-meta">保管: ${esc(savedAt)}</div>
+      <div class="report-history-actions">
+        <button class="report-history-btn" onclick="event.stopPropagation();duplicateReport('${caseId}','${r.id}')" title="複製">📋</button>
+        <button class="report-history-btn" onclick="event.stopPropagation();deleteReport('${caseId}','${r.id}')" title="削除">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function refreshReportsHistory() {
+  const c = cases.find(x=>x.id===currentCaseId); if(!c) return;
+  const el = document.getElementById('reportsHistoryList'); if(!el) return;
+  el.innerHTML = renderReportsHistoryList(getReports(c), c.id);
+}
+
+function startNewReport(caseId) {
+  currentReportId = null;
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const inner = document.getElementById('reportsFormInner'); if(!inner) return;
+  inner.innerHTML = renderReportForm(c);
+  rOurId = 0; rManId = 0; rTheirId = 0; rProcId = 0;
+  rTimeState.periodTime = {h:null,m:null};
+  rTimeState.nextTime   = {h:null,m:null};
+  initReportForm(c);
+  refreshReportsHistory();
+}
+
+function loadReportFromHistory(caseId, reportId) {
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const r = getReports(c).find(x=>x.id===reportId); if(!r) return;
+  currentReportId = reportId;
+  const inner = document.getElementById('reportsFormInner'); if(!inner) return;
+  inner.innerHTML = renderReportForm(c);
+  rOurId = 0; rManId = 0; rTheirId = 0; rProcId = 0;
+  rTimeState.periodTime = {h:null,m:null};
+  rTimeState.nextTime   = {h:null,m:null};
+  restoreReportForm(r.data, c);
+  refreshReportsHistory();
+}
+
+function deleteReport(caseId, reportId) {
+  if (!confirm('この報告書を削除しますか？')) return;
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  c.reports = getReports(c).filter(x=>x.id!==reportId);
+  if (currentReportId === reportId) currentReportId = null;
+  save();
+  refreshReportsHistory();
+  renderSidebar();
+  showNotif('報告書を削除しました。','success');
+  if (gAccessToken) syncToDrive(false);
+}
+
+function duplicateReport(caseId, reportId) {
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const orig = getReports(c).find(x=>x.id===reportId); if(!orig) return;
+  const rec = JSON.parse(JSON.stringify(orig));
+  rec.id = genId();
+  rec.savedAt = new Date().toISOString();
+  c.reports.push(rec);
+  save();
+  currentReportId = rec.id;
+  const inner = document.getElementById('reportsFormInner'); if(!inner) return;
+  inner.innerHTML = renderReportForm(c);
+  rOurId = 0; rManId = 0; rTheirId = 0; rProcId = 0;
+  rTimeState.periodTime = {h:null,m:null};
+  rTimeState.nextTime   = {h:null,m:null};
+  restoreReportForm(rec.data, c);
+  refreshReportsHistory();
+  renderSidebar();
+  showNotif('報告書を複製しました。','success');
+  if (gAccessToken) syncToDrive(false);
+}
+
+// ─── REPORT FORM RENDERING ───────────────────────────────────
+let rOurId = 0, rManId = 0, rTheirId = 0, rProcId = 0;
+
+function renderReportForm(c) {
+  // Default office info from report app defaults
+  const DEFAULT_ZIP = '２３１－００２１';
+  const DEFAULT_ADDR = '横浜市中区日本大通１５番地　横浜朝日会館７階';
+  const DEFAULT_OFFICE = '井澤・黒井法律事務所';
+  const DEFAULT_TEL = '045-225-9023';
+  const DEFAULT_FAX = '045-225-9024';
+  const DEFAULT_LAWYERS = '弁護士　井　澤　秀　昭\n弁護士　佐　山　亮　介';
+  const today = new Date().toISOString().split('T')[0];
+  // Auto-fill from case: caseName, client (first), nextDate
+  const clientName = primaryClientName(c) === '（依頼者未設定）' ? '' : primaryClientName(c);
+  const nextDate = c.nextDate || '';
+
+  return `
+    <div class="report-saved-banner" id="rSavedBanner">✓ 報告書を保管しました</div>
+    <div class="rpanel">
+      <div class="rpanel-head"><div class="rdot"></div>基本情報</div>
+      <div class="rpanel-body">
+        <div class="rsl">日付</div>
+        <div class="rr2">
+          <div class="rfg"><label>作成日</label><input type="date" id="r_docDate" value="${today}" oninput="rUpd()"></div>
+          <div class="rfg"><label>元号表記</label><select id="r_eraType" onchange="rUpd()"><option value="reiwa">令和</option><option value="ad">西暦</option></select></div>
+        </div>
+        <div class="rdivider"></div>
+        <div class="rsl">宛名（依頼者）</div>
+        <div id="r_clientList" style="display:flex;flex-direction:column;gap:7px;"></div>
+        <button class="radd-btn" onclick="rAddClient()">＋ 宛名を追加</button>
+        <div class="rdivider"></div>
+        <div class="rsl">事務所情報</div>
+        <div class="rfg"><label>郵便番号</label><input type="text" id="r_zip" value="${DEFAULT_ZIP}" oninput="rUpd()"></div>
+        <div class="rfg"><label>住所</label><input type="text" id="r_address" value="${DEFAULT_ADDR}" oninput="rUpd()"></div>
+        <div class="rfg"><label>事務所名</label><input type="text" id="r_officeName" value="${DEFAULT_OFFICE}" oninput="rUpd()"></div>
+        <div class="rfg"><label>電話番号</label><input type="text" id="r_tel" value="${DEFAULT_TEL}" oninput="rUpd()"></div>
+        <div class="rfg"><label>FAX番号</label><input type="text" id="r_fax" value="${DEFAULT_FAX}" oninput="rUpd()"></div>
+        <div class="rfg"><label>弁護士氏名</label><textarea id="r_lawyers" rows="2" oninput="rUpd()">${DEFAULT_LAWYERS}</textarea></div>
+      </div>
+    </div>
+    <div class="rpanel">
+      <div class="rpanel-head"><div class="rdot"></div>期日・事件情報</div>
+      <div class="rpanel-body">
+        <div class="rfg"><label>事件名</label><input type="text" id="r_caseName" value="${esc(c.caseName||'')}" placeholder="例：交通損害賠償請求事件" oninput="rUpd()"></div>
+        <div class="rr2">
+          <div class="rfg"><label>期日番号</label><input type="text" id="r_periodNum" placeholder="例：第４回" oninput="rUpd()"></div>
+          <div class="rfg"><label>期日の形式</label><select id="r_periodType" onchange="rUpd()"><option>ウェブ会議</option><option>法廷</option><option>書面</option></select></div>
+        </div>
+        <div class="rr2">
+          <div class="rfg"><label>期日時刻</label>
+            <div class="rtime-picker-wrap">
+              <div class="rtime-display" id="rdisp-periodTime" onclick="rTogglePicker('periodTime')">
+                <span class="td-val" id="rval-periodTime" style="color:var(--text-muted);">時刻を選択</span>
+                <span class="td-icon">▾</span>
+              </div>
+              <div class="rtime-popup" id="rpop-periodTime">
+                <div class="rtp-head"><span>時刻を選択（24時間）</span><button class="rtp-clear" onclick="rClearTime('periodTime')">クリア</button></div>
+                <div class="rtp-cols">
+                  <div class="rtp-col"><div class="rtp-col-label">時</div><div class="rtp-scroll" id="rhrs-periodTime"></div></div>
+                  <div class="rtp-divider"></div>
+                  <div class="rtp-col"><div class="rtp-col-label">分</div><div class="rtp-scroll" id="rmin-periodTime"></div></div>
+                </div>
+                <div class="rtp-foot"><button class="rtp-ok" onclick="rClosePicker('periodTime')">決定</button></div>
+              </div>
+              <input type="hidden" id="r_periodTime">
+            </div>
+          </div>
+          <div class="rfg"><label>期日（当日）</label><input type="date" id="r_periodDate" oninput="rUpd()"></div>
+        </div>
+        <div class="rdivider"></div>
+        <div class="rsl">１　提出書類</div>
+        <div style="font-size:10.5px;font-weight:500;color:var(--text-muted);margin-bottom:-3px;">当方提出書類</div>
+        <div id="r_ourDocList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <button class="radd-btn" onclick="rAddOurDoc()">＋ 書類を追加</button>
+        <div style="font-size:10.5px;font-weight:500;color:var(--text-muted);margin-top:4px;margin-bottom:-3px;">相手方提出書類</div>
+        <div id="r_theirDocList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <button class="radd-btn" onclick="rAddTheirDoc()">＋ 書類を追加</button>
+        <div class="rfg"><label>補足事項（任意）</label><textarea id="r_docsNote" rows="2" placeholder="例：書面の一部を訂正版に差し替えた等" oninput="rUpd()"></textarea></div>
+        <div class="rdivider"></div>
+        <div class="rsl">２　手続の概要</div>
+        <div class="proc-list" id="r_procList"></div>
+        <div class="proc-add-btns">
+          <button onclick="rAddProcRow(0)">＋ 段落を追加</button>
+          <button onclick="rAddProcRow(1)">＋（１）段落</button>
+          <button onclick="rAddProcRow(2)">＋ ア 段落</button>
+        </div>
+        <div class="rdivider"></div>
+        <div class="rsl">３　次回期日</div>
+        <div class="rr2">
+          <div class="rfg"><label>次回期日</label><input type="date" id="r_nextDate" value="${esc(nextDate)}" oninput="rUpd()"></div>
+          <div class="rfg"><label>次回時刻</label>
+            <div class="rtime-picker-wrap">
+              <div class="rtime-display" id="rdisp-nextTime" onclick="rTogglePicker('nextTime')">
+                <span class="td-val" id="rval-nextTime" style="color:var(--text-muted);">時刻を選択</span>
+                <span class="td-icon">▾</span>
+              </div>
+              <div class="rtime-popup" id="rpop-nextTime">
+                <div class="rtp-head"><span>時刻を選択（24時間）</span><button class="rtp-clear" onclick="rClearTime('nextTime')">クリア</button></div>
+                <div class="rtp-cols">
+                  <div class="rtp-col"><div class="rtp-col-label">時</div><div class="rtp-scroll" id="rhrs-nextTime"></div></div>
+                  <div class="rtp-divider"></div>
+                  <div class="rtp-col"><div class="rtp-col-label">分</div><div class="rtp-scroll" id="rmin-nextTime"></div></div>
+                </div>
+                <div class="rtp-foot"><button class="rtp-ok" onclick="rClosePicker('nextTime')">決定</button></div>
+              </div>
+              <input type="hidden" id="r_nextTime">
+            </div>
+          </div>
+        </div>
+        <div class="rfg"><label>次回の形式</label><select id="r_nextType" onchange="rUpd()"><option>ウェブ会議</option><option>法廷</option><option>書面</option></select></div>
+        <div class="rdivider"></div>
+        <div class="rsl">４　当方の準備事項</div>
+        <div class="rfg"><label>準備事項</label><textarea id="r_preparation" rows="2" placeholder="空欄の場合「当方の準備事項はありません。」と出力されます" oninput="rUpd()"></textarea></div>
+      </div>
+    </div>
+    <div class="rpanel">
+      <div class="rpanel-head"><div class="rdot"></div>送付書類</div>
+      <div class="rpanel-body">
+        <div class="rsend-hint">💡 当方・相手方の提出書類が自動で反映されます。</div>
+        <div id="r_sendList" style="display:flex;flex-direction:column;gap:6px;"></div>
+        <button class="radd-btn" onclick="rAddManualSend()">＋ 書類を手動追加</button>
+      </div>
+    </div>
+    <div class="report-btn-row">
+      <button class="report-btn-save" onclick="saveReport('${c.id}')">💾 保管する</button>
+      <button class="report-btn-gen" id="rGenBtn" onclick="generateReportDoc('${c.id}')">📄 Wordファイルを生成</button>
+    </div>`;
+}
+
+function initReportForm(c) {
+  // Build time picker UI
+  rBuildPickerCols('periodTime');
+  rBuildPickerCols('nextTime');
+  // Add default client from case
+  const clientName = primaryClientName(c) === '（依頼者未設定）' ? '' : primaryClientName(c);
+  rAddClient(clientName, '様');
+  // Add default our docs
+  rAddOurDoc('準備書面写し','１通');
+  rAddOurDoc('証拠説明書写し','１通');
+  // Init proc editor with one empty row + drag
+  rAddProcRow(0);
+  rInitProcDrag();
+  // Wire inputs
+  wireReportInputs();
+  rUpd();
+}
+
+function restoreReportForm(data, c) {
+  if (!data) return;
+  // Basic fields
+  const setV = (id, v) => { const el = document.getElementById(id); if(el && v !== undefined) el.value = v; };
+  setV('r_docDate', data.docDate);
+  setV('r_eraType', data.eraType);
+  setV('r_zip', data.zip);
+  setV('r_address', data.address);
+  setV('r_officeName', data.officeName);
+  setV('r_tel', data.tel);
+  setV('r_fax', data.fax);
+  setV('r_lawyers', data.lawyers);
+  setV('r_caseName', data.caseName);
+  setV('r_periodNum', data.periodNum);
+  setV('r_periodType', data.periodType);
+  setV('r_periodDate', data.periodDate);
+  setV('r_docsNote', data.docsNote);
+  setV('r_nextDate', data.nextDate);
+  setV('r_nextType', data.nextType);
+  setV('r_preparation', data.preparation);
+  // Clients
+  document.getElementById('r_clientList').innerHTML = '';
+  (data.clients||[]).forEach(cl => rAddClient(cl.name, cl.hon));
+  if (!data.clients || !data.clients.length) rAddClient('','様');
+  // Our docs
+  document.getElementById('r_ourDocList').innerHTML = '';
+  document.getElementById('r_theirDocList').innerHTML = '';
+  document.getElementById('r_sendList').innerHTML = '';
+  rOurId = 0; rManId = 0; rTheirId = 0;
+  (data.ourDocs||[]).forEach(d => rAddOurDoc(d.name, d.cnt));
+  (data.theirDocs||[]).forEach(n => rAddTheirDoc(n));
+  // Send docs restore checked/cnt/kind
+  (data.sendDocs||[]).forEach(sd => {
+    if (sd.manual) {
+      rAddManualSend(sd.name, sd.cnt, sd.kind||'写し');
+      const rows = document.querySelectorAll('#r_sendList .rsend-row.rmanual-row');
+      const last = rows[rows.length-1];
+      if (last) last.querySelector('input[type=checkbox]').checked = sd.checked;
+    } else if (sd.ref) {
+      const el = document.querySelector(`[data-rsendref="${sd.ref}"]`);
+      if (el) {
+        el.querySelector('input[type=checkbox]').checked = sd.checked;
+        el.querySelector('.scnt').value = sd.cnt;
+        if (sd.edited) el.querySelector('.scnt').setAttribute('data-edited','1');
+        const kEl = el.querySelector('.skind'); if(kEl && sd.kind) kEl.value = sd.kind;
+      }
+    } else if (sd.refTheir) {
+      const el2 = document.querySelector(`[data-rsendref-their="${sd.refTheir}"]`);
+      if (el2) {
+        el2.querySelector('input[type=checkbox]').checked = sd.checked;
+        el2.querySelector('.scnt').value = sd.cnt;
+        const kEl2 = el2.querySelector('.skind'); if(kEl2 && sd.kind) kEl2.value = sd.kind;
+      }
+    }
+  });
+  // Proc
+  document.getElementById('r_procList').innerHTML = '';
+  rProcId = 0;
+  if (Array.isArray(data.proceedings) && data.proceedings.length) {
+    data.proceedings.forEach(item => rAddProcRow(item.level||0, item.text||''));
+  } else if (data.proceedings && typeof data.proceedings === 'string') {
+    data.proceedings.split('\n').forEach(line => { if(line.trim()) rAddProcRow(0, line.trim()); });
+  }
+  if (!document.querySelector('#r_procList .proc-row')) rAddProcRow(0);
+  rRefreshBadges();
+  rInitProcDrag();
+  // Time pickers
+  rBuildPickerCols('periodTime');
+  rBuildPickerCols('nextTime');
+  rRestoreTime('periodTime', data.periodTime||'');
+  rRestoreTime('nextTime', data.nextTime||'');
+  wireReportInputs();
+  rUpd();
+}
+
+function wireReportInputs() {
+  document.querySelectorAll('#reportsFormInner input, #reportsFormInner textarea, #reportsFormInner select').forEach(el => {
+    el.addEventListener('input', rUpd);
+    el.addEventListener('change', rUpd);
+  });
+}
+
+// ─── REPORT CLIENTS ──────────────────────────────────────────
+function rAddClient(name, hon) {
+  name = name||''; hon = hon||'様';
+  const row = document.createElement('div');
+  row.className = 'rclient-row';
+  row.innerHTML = `<input type="text" value="${esc(name)}" placeholder="例：山田　花子" oninput="rUpd()">
+    <select onchange="rUpd()">
+      <option${hon==='様'?' selected':''}>様</option>
+      <option${hon==='殿'?' selected':''}>殿</option>
+      <option${hon==='御中'?' selected':''}>御中</option>
+      <option${hon==='先生'?' selected':''}>先生</option>
+    </select>
+    <button class="rrm" onclick="if(document.querySelectorAll('.rclient-row').length>1)this.closest('.rclient-row').remove();rUpd();">✕</button>`;
+  document.getElementById('r_clientList').appendChild(row);
+  rUpd();
+}
+function rGetClients() {
+  return Array.from(document.querySelectorAll('.rclient-row')).map(r => {
+    const n = r.querySelector('input').value.trim();
+    const h = r.querySelector('select').value;
+    return n ? n+'　'+h : null;
+  }).filter(Boolean);
+}
+function rGetClientNames() {
+  return Array.from(document.querySelectorAll('.rclient-row')).map(r => r.querySelector('input').value.trim()).filter(Boolean);
+}
+function rGetClientsData() {
+  return Array.from(document.querySelectorAll('.rclient-row')).map(r => ({
+    name: r.querySelector('input').value.trim(),
+    hon: r.querySelector('select').value
+  }));
+}
+
+// ─── REPORT DOCS ─────────────────────────────────────────────
+function rKindSelect(val) {
+  val = val||'写し';
+  return `<select class="skind" onchange="rUpd()">
+    <option value="写し"${val==='写し'?' selected':''}>写し</option>
+    <option value="原本"${val==='原本'?' selected':''}>原本</option>
+  </select>`;
+}
+function rAddOurDoc(name, cnt) {
+  name = name||''; cnt = cnt||'１通';
+  const id = 'rod'+(rOurId++);
+  const row = document.createElement('div');
+  row.className = 'rdoc-row'; row.setAttribute('data-rourid', id);
+  row.innerHTML = `<input class="dname" type="text" value="${esc(name)}" placeholder="書類名" oninput="rSyncSend('${id}');rUpd()">
+    <input class="dcnt" type="text" value="${esc(cnt)}" oninput="rSyncSendCnt('${id}');rUpd()">
+    <button class="rrm" onclick="rRemoveOurDoc('${id}')">✕</button>`;
+  document.getElementById('r_ourDocList').appendChild(row);
+  rAddSyncedSend(id, name, cnt);
+  rUpd();
+}
+function rRemoveOurDoc(id) {
+  const r = document.querySelector(`[data-rourid="${id}"]`); if(r) r.remove();
+  const s = document.querySelector(`[data-rsendref="${id}"]`); if(s) s.remove();
+  rUpd();
+}
+function rSyncSend(id) {
+  const src = document.querySelector(`[data-rourid="${id}"]`); if(!src) return;
+  const dst = document.querySelector(`[data-rsendref="${id}"]`); if(!dst) return;
+  dst.querySelector('.sname').textContent = src.querySelector('.dname').value||'（書類名未入力）';
+}
+function rSyncSendCnt(id) {
+  const src = document.querySelector(`[data-rourid="${id}"]`); if(!src) return;
+  const dst = document.querySelector(`[data-rsendref="${id}"]`); if(!dst) return;
+  const scnt = dst.querySelector('.scnt'); if(!scnt.getAttribute('data-edited')) scnt.value = src.querySelector('.dcnt').value;
+}
+function rGetOurDocs() {
+  return Array.from(document.querySelectorAll('#r_ourDocList .rdoc-row')).map(r => ({
+    id: r.getAttribute('data-rourid'),
+    name: r.querySelector('.dname').value.trim(),
+    cnt: r.querySelector('.dcnt').value.trim()
+  })).filter(d => d.name);
+}
+function rAddTheirDoc(name) {
+  name = name||'';
+  const id = 'rtd'+(rTheirId++);
+  const row = document.createElement('div');
+  row.className = 'rother-row'; row.setAttribute('data-rtheirid', id);
+  row.innerHTML = `<span style="font-size:10.5px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">相手方：</span>
+    <input type="text" value="${esc(name)}" placeholder="書類名（例：答弁書写し）" oninput="rSyncTheirSend('${id}');rUpd()">
+    <button class="rrm" onclick="rRemoveTheirDoc('${id}')">✕</button>`;
+  document.getElementById('r_theirDocList').appendChild(row);
+  rAddSyncedSendTheir(id, name);
+  rUpd();
+}
+function rRemoveTheirDoc(id) {
+  const r = document.querySelector(`[data-rtheirid="${id}"]`); if(r) r.remove();
+  const s = document.querySelector(`[data-rsendref-their="${id}"]`); if(s) s.remove();
+  rUpd();
+}
+function rSyncTheirSend(id) {
+  const src = document.querySelector(`[data-rtheirid="${id}"]`); if(!src) return;
+  const dst = document.querySelector(`[data-rsendref-their="${id}"]`); if(!dst) return;
+  dst.querySelector('.sname').textContent = src.querySelector('input[type=text]').value||'（書類名未入力）';
+}
+function rGetTheirDocs() {
+  return Array.from(document.querySelectorAll('#r_theirDocList .rother-row')).map(r => r.querySelector('input[type=text]').value.trim()).filter(Boolean);
+}
+function rAddSyncedSend(refId, name, cnt, kind) {
+  const row = document.createElement('div');
+  row.className = 'rsend-row'; row.setAttribute('data-rsendref', refId);
+  row.innerHTML = `<input type="checkbox" checked onchange="rUpd()">
+    <span class="sname">${esc(name||'（書類名未入力）')}</span>
+    ${rKindSelect(kind)}
+    <input class="scnt" type="text" value="${esc(cnt||'１通')}" oninput="this.setAttribute('data-edited','1');rUpd()">`;
+  document.getElementById('r_sendList').appendChild(row);
+}
+function rAddSyncedSendTheir(refId, name, kind) {
+  const row = document.createElement('div');
+  row.className = 'rsend-row'; row.setAttribute('data-rsendref-their', refId);
+  row.innerHTML = `<input type="checkbox" checked onchange="rUpd()">
+    <span class="sname">${esc(name||'（書類名未入力）')}</span>
+    ${rKindSelect(kind)}
+    <input class="scnt" type="text" value="１通" oninput="this.setAttribute('data-edited','1');rUpd()">`;
+  document.getElementById('r_sendList').appendChild(row);
+}
+function rAddManualSend(name, cnt, kind) {
+  name = name||''; cnt = cnt||'１通';
+  const id = 'rms'+(rManId++);
+  const row = document.createElement('div');
+  row.className = 'rsend-row rmanual-row'; row.setAttribute('data-rsendref', id);
+  row.innerHTML = `<input type="checkbox" checked onchange="rUpd()">
+    <input class="sname-input" type="text" value="${esc(name)}" placeholder="書類名" oninput="rUpd()">
+    ${rKindSelect(kind)}
+    <input class="scnt" type="text" value="${esc(cnt)}" oninput="rUpd()">
+    <button class="rrm" onclick="this.closest('.rsend-row').remove();rUpd();">✕</button>`;
+  document.getElementById('r_sendList').appendChild(row); rUpd();
+}
+function rGetSendDocs() {
+  return Array.from(document.querySelectorAll('#r_sendList .rsend-row')).map(r => {
+    const chk = r.querySelector('input[type=checkbox]').checked;
+    const nameEl = r.querySelector('.sname')||r.querySelector('.sname-input');
+    const name = (nameEl.tagName==='INPUT' ? nameEl.value : nameEl.textContent).trim();
+    const cnt = r.querySelector('.scnt').value.trim();
+    const kindEl = r.querySelector('.skind');
+    const kind = kindEl ? kindEl.value : '写し';
+    return (chk && name) ? {name, cnt, kind} : null;
+  }).filter(Boolean);
+}
+
+// ─── PROC EDITOR ─────────────────────────────────────────────
+const KAN_NUM = ['１','２','３','４','５','６','７','８','９','１０','１１','１２','１３','１４','１５'];
+const KAT = ['ア','イ','ウ','エ','オ','カ','キ','ク','ケ','コ','サ','シ','ス','セ','ソ'];
+let _rDragSrc = null;
+
+function rGetProcRows() { return Array.from(document.querySelectorAll('#r_procList .proc-row')); }
+function rCalcBadge(row) {
+  const level = parseInt(row.getAttribute('data-level'));
+  if (level === 0) return '';
+  const allRows = rGetProcRows();
+  const idx = allRows.indexOf(row);
+  if (level === 1) {
+    let cnt = 0;
+    for (let i=0; i<=idx; i++) { if (parseInt(allRows[i].getAttribute('data-level'))===1) cnt++; }
+    return '（'+KAN_NUM[cnt-1]+'）';
+  }
+  if (level === 2) {
+    let cnt2 = 0;
+    for (let i=idx; i>=0; i--) {
+      const lv = parseInt(allRows[i].getAttribute('data-level'));
+      if (lv===1) break;
+      if (lv===2) cnt2++;
+    }
+    return KAT[cnt2-1];
+  }
+  return '';
+}
+function rRefreshBadges() {
+  rGetProcRows().forEach(row => { const b=row.querySelector('.proc-badge'); if(b) b.textContent=rCalcBadge(row); });
+}
+function rAddProcRow(level, text, insertAfterEl) {
+  level = level||0; text = text||'';
+  const id = 'rpr'+(rProcId++);
+  const row = document.createElement('div');
+  row.className = 'proc-row level-'+level;
+  row.setAttribute('data-level', level);
+  row.setAttribute('data-id', id);
+  const ph = level===0?'本文を入力':level===1?'（　）段落の内容を入力':'ア段落の内容を入力';
+  row.setAttribute('draggable','true');
+  row.innerHTML = `<div class="drag-handle" title="ドラッグして並び替え">⠿</div>
+    <div class="proc-badge"></div>
+    <textarea rows="1" placeholder="${ph}" oninput="rAutoResize(this);rUpd()" onkeydown="rProcKeyDown(event,'${id}')">${esc(text)}</textarea>
+    <div class="proc-row-btns">
+      <button onclick="rMoveProcRow('${id}','up')" title="上へ">↑</button>
+      <button onclick="rMoveProcRow('${id}','down')" title="下へ">↓</button>
+      <button onclick="rRemoveProcRow('${id}')" title="削除">✕</button>
+    </div>`;
+  const list = document.getElementById('r_procList');
+  if (insertAfterEl && insertAfterEl.parentNode===list) insertAfterEl.insertAdjacentElement('afterend', row);
+  else list.appendChild(row);
+  rRefreshBadges();
+  const ta = row.querySelector('textarea');
+  rAutoResize(ta);
+  ta.focus();
+  rUpd();
+  return row;
+}
+function rRemoveProcRow(id) {
+  const row = document.querySelector(`#r_procList [data-id="${id}"]`);
+  if (row && rGetProcRows().length>1) { row.remove(); rRefreshBadges(); rUpd(); }
+}
+function rMoveProcRow(id, dir) {
+  const row = document.querySelector(`#r_procList [data-id="${id}"]`); if(!row) return;
+  const list = document.getElementById('r_procList');
+  if (dir==='up' && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
+  else if (dir==='down' && row.nextElementSibling) row.nextElementSibling.insertAdjacentElement('afterend', row);
+  rRefreshBadges(); rUpd();
+}
+function rAutoResize(ta) { ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; }
+function rProcKeyDown(e, id) {
+  if (e.key==='Enter' && e.shiftKey) {
+    e.preventDefault();
+    const row = document.querySelector(`#r_procList [data-id="${id}"]`);
+    const level = parseInt(row.getAttribute('data-level'));
+    rAddProcRow(level,'',row);
+  }
+}
+function rGetProcData() {
+  return rGetProcRows().map(row => ({
+    level: parseInt(row.getAttribute('data-level')),
+    text: row.querySelector('textarea').value.trim(),
+    badge: rCalcBadge(row)
+  })).filter(r => r.text);
+}
+
+// Drag & drop for proc
+function rInitProcDrag() {
+  const list = document.getElementById('r_procList'); if(!list) return;
+  list.addEventListener('dragstart', e => {
+    const row = e.target.closest('.proc-row'); if(!row) return;
+    _rDragSrc = row; row.classList.add('dragging'); e.dataTransfer.effectAllowed='move';
+  });
+  list.addEventListener('dragend', e => {
+    const row = e.target.closest('.proc-row'); if(row) row.classList.remove('dragging');
+    document.querySelectorAll('.proc-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    _rDragSrc = null;
+  });
+  list.addEventListener('dragover', e => {
+    e.preventDefault();
+    const row = e.target.closest('.proc-row'); if(!row||row===_rDragSrc) return;
+    document.querySelectorAll('.proc-row.drag-over').forEach(r=>r.classList.remove('drag-over'));
+    row.classList.add('drag-over'); e.dataTransfer.dropEffect='move';
+  });
+  list.addEventListener('dragleave', e => { const row=e.target.closest('.proc-row'); if(row) row.classList.remove('drag-over'); });
+  list.addEventListener('drop', e => {
+    e.preventDefault();
+    const target = e.target.closest('.proc-row');
+    if (!target||!_rDragSrc||target===_rDragSrc) return;
+    target.classList.remove('drag-over');
+    const rows = Array.from(list.querySelectorAll('.proc-row'));
+    const srcIdx = rows.indexOf(_rDragSrc), tgtIdx = rows.indexOf(target);
+    if (srcIdx < tgtIdx) target.insertAdjacentElement('afterend', _rDragSrc);
+    else list.insertBefore(_rDragSrc, target);
+    rRefreshBadges(); rUpd();
+  });
+}
+
+// ─── REPORT TIME PICKER ──────────────────────────────────────
+const rTimeState = { periodTime: {h:null,m:null}, nextTime: {h:null,m:null} };
+function rToZen(s) { return String(s||'').replace(/[0-9]/g, c=>String.fromCharCode(c.charCodeAt(0)+0xFEE0)); }
+function rHDisp(h) { return rToZen(String(h))+'時'; }
+function rHToJp(h) {
+  if(h===0) return '午前０時';
+  if(h<12) return '午前'+rToZen(String(h))+'時';
+  if(h===12) return '午後０時';
+  return '午後'+rToZen(String(h-12))+'時';
+}
+function rMToJp(m) { return rToZen(String(m).padStart(2,'0'))+'分'; }
+function rBuildPickerCols(fieldId) {
+  const hrsEl = document.getElementById('rhrs-'+fieldId); if(!hrsEl) return;
+  hrsEl.innerHTML = '';
+  for (let i=0; i<24; i++) {
+    const d = document.createElement('div'); d.className='rtp-item'; d.setAttribute('data-h',i); d.textContent=rHDisp(i);
+    d.onclick = (v => () => rSelectHour(fieldId,v))(i);
+    hrsEl.appendChild(d);
+  }
+  const minEl = document.getElementById('rmin-'+fieldId); if(!minEl) return;
+  minEl.innerHTML = '';
+  for (let j=0; j<60; j+=5) {
+    const d = document.createElement('div'); d.className='rtp-item'; d.setAttribute('data-m',j); d.textContent=rMToJp(j);
+    d.onclick = (v => () => rSelectMin(fieldId,v))(j);
+    minEl.appendChild(d);
+  }
+}
+function rSelectHour(fieldId, h) {
+  rTimeState[fieldId].h=h;
+  document.querySelectorAll('#rhrs-'+fieldId+' .rtp-item').forEach(el=>el.classList.toggle('selected',parseInt(el.getAttribute('data-h'))===h));
+  rCommitTime(fieldId);
+}
+function rSelectMin(fieldId, m) {
+  rTimeState[fieldId].m=m;
+  document.querySelectorAll('#rmin-'+fieldId+' .rtp-item').forEach(el=>el.classList.toggle('selected',parseInt(el.getAttribute('data-m'))===m));
+  rCommitTime(fieldId);
+}
+function rCommitTime(fieldId) {
+  const s = rTimeState[fieldId];
+  const valEl = document.getElementById('rval-'+fieldId);
+  const hidEl = document.getElementById('r_'+fieldId);
+  if (!valEl || !hidEl) return;
+  if (s.h===null && s.m===null) {
+    if(hidEl) hidEl.value=''; valEl.textContent='時刻を選択'; valEl.style.color='var(--text-muted)';
+  } else {
+    const h=s.h!==null?s.h:0, m=s.m!==null?s.m:0;
+    valEl.textContent = rHDisp(h)+rMToJp(m); valEl.style.color='var(--ink)';
+    hidEl.value = rHToJp(h)+rMToJp(m);
+  }
+  rUpd();
+}
+function rClearTime(fieldId) {
+  rTimeState[fieldId]={h:null,m:null};
+  document.querySelectorAll('#rhrs-'+fieldId+' .rtp-item, #rmin-'+fieldId+' .rtp-item').forEach(el=>el.classList.remove('selected'));
+  rCommitTime(fieldId);
+}
+function rTogglePicker(fieldId) {
+  const pop = document.getElementById('rpop-'+fieldId); if(!pop) return;
+  const isOpen = pop.classList.contains('show');
+  document.querySelectorAll('.rtime-popup.show').forEach(p=>p.classList.remove('show'));
+  document.querySelectorAll('.rtime-display.open').forEach(d=>d.classList.remove('open'));
+  if (!isOpen) {
+    pop.classList.add('show');
+    document.getElementById('rdisp-'+fieldId).classList.add('open');
+    setTimeout(()=>rScrollToSelected(fieldId),10);
+  }
+}
+function rClosePicker(fieldId) {
+  const p=document.getElementById('rpop-'+fieldId); if(p) p.classList.remove('show');
+  const d=document.getElementById('rdisp-'+fieldId); if(d) d.classList.remove('open');
+}
+function rScrollToSelected(fieldId) {
+  const hSel = document.querySelector('#rhrs-'+fieldId+' .rtp-item.selected');
+  const mSel = document.querySelector('#rmin-'+fieldId+' .rtp-item.selected');
+  if (hSel) hSel.scrollIntoView({block:'center',behavior:'instant'});
+  else { const el=document.getElementById('rhrs-'+fieldId); if(el) el.scrollTop=0; }
+  if (mSel) mSel.scrollIntoView({block:'center',behavior:'instant'});
+  else { const el=document.getElementById('rmin-'+fieldId); if(el) el.scrollTop=0; }
+}
+function rRestoreTime(fieldId, val) {
+  if (!val) { rClearTime(fieldId); return; }
+  let h=null, m=null;
+  const v = val.replace(/[０-９]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0));
+  const mAM=v.match(/午前(\d+)時(\d+)分/), mPM=v.match(/午後(\d+)時(\d+)分/);
+  if(mAM){h=parseInt(mAM[1]);m=parseInt(mAM[2]);}
+  else if(mPM){h=parseInt(mPM[1])+12;m=parseInt(mPM[2]);}
+  if(h!==null && m!==null){
+    rTimeState[fieldId]={h,m};
+    document.querySelectorAll('#rhrs-'+fieldId+' .rtp-item').forEach(el=>el.classList.toggle('selected',parseInt(el.getAttribute('data-h'))===h));
+    const mRound=Math.round(m/5)*5%60;
+    document.querySelectorAll('#rmin-'+fieldId+' .rtp-item').forEach(el=>el.classList.toggle('selected',parseInt(el.getAttribute('data-m'))===mRound));
+    rTimeState[fieldId].m=mRound;
+    rCommitTime(fieldId);
+  } else { rClearTime(fieldId); }
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.rtime-picker-wrap')) {
+    document.querySelectorAll('.rtime-popup.show').forEach(p=>p.classList.remove('show'));
+    document.querySelectorAll('.rtime-display.open').forEach(d=>d.classList.remove('open'));
+  }
+}, true);
+
+// ─── PREVIEW UPDATE ──────────────────────────────────────────
+function rUpd() {
+  const g = id => { const el=document.getElementById(id); return el?el.value:''; };
+  const era = g('r_eraType');
+  const pvDate = document.getElementById('rpv-date');
+  if (pvDate) pvDate.textContent = rToJpDate(g('r_docDate'),era)||'　　年　月　日';
+  const cl = rGetClients();
+  const pvToBlock = document.getElementById('rpv-to-block');
+  if (pvToBlock) pvToBlock.innerHTML = (cl.length?cl:['○○　○○　様']).map(c=>`<div class="pvto">${esc(c)}</div>`).join('');
+  const zip=g('r_zip'),addr=g('r_address'),ofc=g('r_officeName'),tel=g('r_tel'),fax=g('r_fax');
+  const law=(g('r_lawyers')||'').split('\n').filter(l=>l.trim());
+  let fh='';
+  if(zip)fh+='〒'+zip+'<br>';if(addr)fh+=addr+'<br>';if(ofc)fh+=ofc+'<br>';
+  if(tel||fax)fh+='電　話　'+tel+'　ＦＡＸ　'+fax+'<br>';
+  law.forEach((l,i)=>{fh+=l+'<br>';if(i<law.length-1)fh+='<br>';});
+  const pvFrom=document.getElementById('rpv-from'); if(pvFrom) pvFrom.innerHTML=fh;
+  const pt=g('r_periodTime')||'　　時　　分';
+  const cn=g('r_caseName')||'　　　　事件';
+  const pn=g('r_periodNum')||'第　回';
+  const ty=g('r_periodType')||'ウェブ会議';
+  const pd=g('r_periodDate'), dd2=g('r_docDate');
+  const dayRef2=(pd&&pd!==dd2)?rToJpDate(pd,era):'本日';
+  const pvIntro=document.getElementById('rpv-intro');
+  if(pvIntro) pvIntro.textContent='　'+dayRef2+pt+'から、ご依頼の'+cn+'について、'+pn+'期日が'+ty+'で実施されましたので、以下、概要をご報告します。';
+  const ourDocs=rGetOurDocs(),theirDocs=rGetTheirDocs(),note=g('r_docsNote');
+  const hasOur=ourDocs.length>0,hasTheir=theirDocs.length>0;
+  let ds='';
+  if(hasOur&&hasTheir){ds+='　　当方は、'+ourDocs.map(d=>d.name).join('、')+'を提出しました。';ds+='\n　　相手方は、'+theirDocs.join('、')+'を提出しました。';}
+  else if(hasOur&&!hasTheir){ds+='　　当方は、'+ourDocs.map(d=>d.name).join('、')+'を提出しました。';ds+='\n　　相手方の提出書類はありません。';}
+  else if(!hasOur&&hasTheir){ds+='　　相手方は、'+theirDocs.join('、')+'を提出しました。';ds+='\n　　当方の提出書類はありません。';}
+  else{ds+='　　当方の提出書類はありません。';ds+='\n　　相手方の提出書類はありません。';}
+  if(note)ds+='\n　　なお、'+note;
+  ds+='\n　　各書類の写しをお送りしますのでご確認下さい。';
+  const pvDocs=document.getElementById('rpv-docs'); if(pvDocs) pvDocs.textContent=ds;
+  const procItems=rGetProcData();
+  const procLines=procItems.map(r=>r.level===0?'　　'+r.text:r.level===1?r.badge+'　'+r.text:'　　'+r.badge+'　'+r.text);
+  const pvProc=document.getElementById('rpv-proc'); if(pvProc) pvProc.textContent=procLines.length?procLines.join('\n'):'　（未入力）';
+  const nd=g('r_nextDate'),nt=g('r_nextTime')||'',nty=g('r_nextType')||'ウェブ会議';
+  const pvNext=document.getElementById('rpv-next'); if(pvNext) pvNext.textContent='　　次回期日は、'+(rToJpDate(nd,era)||'　年　月　日')+rDow(nd)+nt+'から本日と同様に'+nty+'として実施される予定です。';
+  const prep=g('r_preparation');
+  const pvPrep=document.getElementById('rpv-prep'); if(pvPrep) pvPrep.textContent='　　'+(prep||'当方の準備事項はありません。');
+  const sdN=['１','２','３','４','５','６','７','８','９','１０'];
+  const sd=rGetSendDocs(); const TOTAL_W=36;
+  const sdLines=sd.map((d,i)=>{
+    const kindStr=d.kind&&d.kind!=='写し'?'（'+d.kind+'）':'（写し）';
+    const prefix='　'+sdN[i]+'　';
+    let padCount=TOTAL_W-prefix.length-d.name.length-kindStr.length-d.cnt.length;
+    if(padCount<1)padCount=1;
+    return prefix+d.name+kindStr+'　'.repeat(padCount)+d.cnt;
+  });
+  if(sdLines.length)sdLines.push('以上');
+  const pvSdocs=document.getElementById('rpv-sdocs');
+  if(pvSdocs) pvSdocs.innerHTML=sdLines.length?sdLines.map((l,i)=>i===sdLines.length-1&&l==='以上'?`<span style="display:block;text-align:right;">以上</span>`:l).join('<br>'):'（なし）';
+}
+
+function rToJpDate(s, era) {
+  if (!s) return '';
+  const d=new Date(s+'T00:00:00'),y=d.getFullYear(),m=d.getMonth()+1,day=d.getDate();
+  if (era==='ad') return y+'年'+m+'月'+day+'日';
+  if (y>2019||(y===2019&&m>=5)){const ry=y-2018;return '令和'+(ry===1?'元':ry)+'年'+m+'月'+day+'日';}
+  if (y>=1989) return '平成'+(y-1988)+'年'+m+'月'+day+'日';
+  return y+'年'+m+'月'+day+'日';
+}
+function rDow(s) { if(!s) return ''; return '（'+'日月火水木金土'[new Date(s+'T00:00:00').getDay()]+'）'; }
+
+// ─── SAVE REPORT ─────────────────────────────────────────────
+function rCollectFormData() {
+  const g = id => { const el=document.getElementById(id); return el?el.value:''; };
+  const clients = rGetClientsData();
+  const ourDocs = Array.from(document.querySelectorAll('#r_ourDocList .rdoc-row')).map(r=>({name:r.querySelector('.dname').value,cnt:r.querySelector('.dcnt').value}));
+  const theirDocs = Array.from(document.querySelectorAll('#r_theirDocList .rother-row')).map(r=>r.querySelector('input[type=text]').value);
+  const sendDocs = Array.from(document.querySelectorAll('#r_sendList .rsend-row')).map(r=>{
+    const isManual=r.classList.contains('rmanual-row');
+    const chk=r.querySelector('input[type=checkbox]').checked;
+    const nameEl=r.querySelector('.sname')||r.querySelector('.sname-input');
+    const name=(nameEl.tagName==='INPUT'?nameEl.value:nameEl.textContent).trim();
+    const cnt=r.querySelector('.scnt').value;
+    const edited=r.querySelector('.scnt').getAttribute('data-edited')==='1';
+    const ref=r.getAttribute('data-rsendref')||null;
+    const refTheir=r.getAttribute('data-rsendref-their')||null;
+    const kindEl=r.querySelector('.skind');
+    const kind=kindEl?kindEl.value:'写し';
+    return{ref,refTheir,name,cnt,kind,checked:chk,edited,manual:isManual};
+  });
+  return {
+    docDate:g('r_docDate'),eraType:g('r_eraType'),clients,
+    zip:g('r_zip'),address:g('r_address'),officeName:g('r_officeName'),
+    tel:g('r_tel'),fax:g('r_fax'),lawyers:g('r_lawyers'),
+    caseName:g('r_caseName'),periodNum:g('r_periodNum'),
+    periodType:g('r_periodType'),periodTime:g('r_periodTime'),periodDate:g('r_periodDate'),
+    ourDocs,theirDocs,docsNote:g('r_docsNote'),
+    proceedings:rGetProcData(),
+    nextDate:g('r_nextDate'),nextTime:g('r_nextTime'),nextType:g('r_nextType'),
+    preparation:g('r_preparation'),sendDocs
+  };
+}
+
+function saveReport(caseId) {
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const data = rCollectFormData();
+  const clientNames = data.clients.map(cl=>cl.name).filter(Boolean);
+  if (!clientNames.length && !data.caseName) { alert('依頼者名または事件名を入力してから保管してください。'); return; }
+  if (!c.reports) c.reports = [];
+  const rec = {
+    id: currentReportId || genId(),
+    savedAt: new Date().toISOString(),
+    clientNames,
+    caseName: data.caseName,
+    periodNum: data.periodNum,
+    docDate: data.docDate,
+    eraType: data.eraType,
+    data
+  };
+  const idx = c.reports.findIndex(x=>x.id===rec.id);
+  if (idx>=0) c.reports[idx]=rec; else c.reports.push(rec);
+  currentReportId = rec.id;
+  save();
+  refreshReportsHistory();
+  renderSidebar();
+  showNotif('報告書を保管しました。','success');
+  const banner=document.getElementById('rSavedBanner');
+  if(banner){banner.classList.add('show');setTimeout(()=>banner.classList.remove('show'),3000);}
+  if (gAccessToken) syncToDrive(false);
+}
+
+// ─── WORD GENERATION ─────────────────────────────────────────
+function rLoadJSZip() {
+  return new Promise((res, rej) => {
+    if (window.JSZip) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = res; s.onerror = rej;
+    document.head.appendChild(s);
+  });
+}
+
+// Word用ユーティリティ
+function rXe(t) { return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function rToHan(s) { return String(s||'').replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[0-9]/g,c=>c); }
+function rZ(s) { return rToZen(s); }
+function rH(s) { return rToHan(s); }
+
+function rXr(text, o) {
+  o = o||{};
+  const f = 'ＭＳ 明朝';
+  // w:eastAsia を明示することで半角文字もMS明朝で描画される
+  const rPr = '<w:rPr><w:rFonts w:ascii="'+f+'" w:hAnsi="'+f+'" w:eastAsia="'+f+'" w:cs="'+f+'"/>'
+    +(o.bold?'<w:b/><w:bCs/>':'')
+    +(o.ul?'<w:u w:val="single"/>':'')
+    +(o.sz?'<w:sz w:val="'+o.sz+'"/><w:szCs w:val="'+o.sz+'"/>':'<w:sz w:val="24"/><w:szCs w:val="24"/>')
+    +'</w:rPr>';
+  const t = rXe(text);
+  return '<w:r>'+rPr+'<w:t'+((/^ | $/.test(t))?' xml:space="preserve"':'')+'>'+t+'</w:t></w:r>';
+}
+
+function rXp(r, o) {
+  o = o||{};
+  const jc = o.jc ? '<w:jc w:val="'+o.jc+'"/>' : '';
+  const sa = '<w:spacing w:after="'+(o.sa||0)+'"/>';
+  let ind = '';
+  if (o.hang)        ind = '<w:ind w:left="245" w:hanging="245"/>';
+  else if (o.procCont)  ind = '<w:ind w:left="480" w:firstLine="240"/>';
+  else if (o.ind)    ind = '<w:ind w:left="245" w:firstLine="245"/>';
+  else if (o.procL0) ind = '<w:ind w:left="480" w:hanging="480"/>';
+  else if (o.procL0cont) ind = '<w:ind w:left="480"/>';
+  else if (o.procL1) ind = '<w:ind w:left="480" w:hanging="480"/>';
+  else if (o.procL1cont) ind = '<w:ind w:left="480"/>';
+  else if (o.procL2) ind = '<w:ind w:left="720" w:hanging="240"/>';
+  else if (o.procL2cont) ind = '<w:ind w:left="720" w:firstLine="240"/>';
+  const ww = (o.jc==='right') ? '<w:wordWrap w:val="0"/>' : '';
+  return '<w:p><w:pPr>'+jc+sa+ind+ww+'</w:pPr>'+(Array.isArray(r)?r.join(''):r)+'</w:p>';
+}
+function rEp() { return '<w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p>'; }
+
+async function generateReportDoc(caseId) {
+  const btn = document.getElementById('rGenBtn');
+  const sdot = document.getElementById('rSdot');
+  const stxt = document.getElementById('rStxt');
+  if (btn) { btn.innerHTML='⏳ 生成中...'; btn.disabled=true; }
+  if (sdot) sdot.className='sdot run';
+  if (stxt) stxt.textContent='Wordファイルを生成しています...';
+
+  try {
+    await rLoadJSZip();
+
+    const g = id => { const el=document.getElementById(id); return el?el.value:''; };
+    const era = g('r_eraType');
+    const dateJp = rToJpDate(g('r_docDate'), era);
+    const clients = rGetClients();
+    const zip = g('r_zip'), addr = g('r_address');
+    const ofc = g('r_officeName'), tel = g('r_tel'), fax = g('r_fax');
+    const lawyers = g('r_lawyers').split('\n').filter(l=>l.trim());
+    const cn = g('r_caseName'), pn = g('r_periodNum');
+    const pty = g('r_periodType'), pt = g('r_periodTime');
+    const ourDocs = rGetOurDocs(), theirDocs = rGetTheirDocs();
+    const note = g('r_docsNote');
+    const nd = g('r_nextDate'), nt = g('r_nextTime'), nty = g('r_nextType');
+    const prep = g('r_preparation');
+    const sendDocs = rGetSendDocs();
+    const ndJp = rToJpDate(nd, era), ndDow = rDow(nd);
+    const periodDateVal = g('r_periodDate');
+    const docDateVal = g('r_docDate');
+    const dayRefWord = (periodDateVal && periodDateVal!==docDateVal) ? rToJpDate(periodDateVal,era) : '本日';
+
+    // 提出書類テキスト
+    const docsLines = [];
+    const hasOurW = ourDocs.length>0, hasTheirW = theirDocs.length>0;
+    if (hasOurW && hasTheirW) {
+      docsLines.push('当方は、'+ourDocs.map(d=>d.name).join('、')+'を提出しました。');
+      docsLines.push('相手方は、'+theirDocs.join('、')+'を提出しました。');
+    } else if (hasOurW && !hasTheirW) {
+      docsLines.push('当方は、'+ourDocs.map(d=>d.name).join('、')+'を提出しました。');
+      docsLines.push('相手方の提出書類はありません。');
+    } else if (!hasOurW && hasTheirW) {
+      docsLines.push('相手方は、'+theirDocs.join('、')+'を提出しました。');
+      docsLines.push('当方の提出書類はありません。');
+    } else {
+      docsLines.push('当方の提出書類はありません。');
+      docsLines.push('相手方の提出書類はありません。');
+    }
+    if (note) { note.split('\n').forEach((line,i)=>{ docsLines.push((i===0?'なお、':'')+line); }); }
+    docsLines.push('各書類の写しをお送りしますのでご確認下さい。');
+
+    const sdN = ['１','２','３','４','５','６','７','８','９','１０'];
+    const TOTAL_WIDTH = 36;
+
+    let body = '';
+
+    // タイトル
+    body += '<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/><w:rPr><w:rFonts w:ascii="ＭＳ 明朝" w:hAnsi="ＭＳ 明朝" w:eastAsia="ＭＳ 明朝" w:cs="ＭＳ 明朝"/><w:sz w:val="36"/><w:szCs w:val="36"/></w:rPr></w:pPr>'+rXr('経過報告書',{sz:36,bold:true})+'</w:p>';
+
+    // 日付（右揃え）
+    body += rXp(rXr(rZ(dateJp)||'　　年　月　日'), {jc:'right'});
+    body += rEp();
+
+    // 依頼者名（下線付き）
+    (clients.length ? clients : ['　　　　　様']).forEach(c => {
+      body += '<w:p><w:pPr><w:rPr><w:rFonts w:ascii="ＭＳ 明朝" w:hAnsi="ＭＳ 明朝" w:eastAsia="ＭＳ 明朝" w:cs="ＭＳ 明朝"/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr></w:pPr>'+rXr(rZ(c),{ul:true,sz:28})+'</w:p>';
+    });
+    body += rEp();
+
+    // 事務所情報（右揃え）
+    if (zip||addr||ofc) {
+      // 郵便番号：数字を全角、ハイフンを全角ハイフンに
+      const zipStr  = zip  ? '〒'+rZ(zip).replace(/-/g,'－').replace(/－/g,'－') : '';
+      const addrStr = addr ? rZ(addr) : '';
+      const ofcStr  = ofc  ? rZ(ofc)  : '';
+      const baseLen = addrStr.length;
+      const padR = s => { const d=baseLen-s.length; return d>0?s+'　'.repeat(d):s; };
+      if (zipStr)  body += rXp(rXr(padR(zipStr)),  {jc:'right'});
+      if (addrStr) body += rXp(rXr(addrStr),        {jc:'right'});
+      if (ofcStr)  body += rXp(rXr(padR(ofcStr)),  {jc:'right'});
+    }
+    // 電話・FAXのみ半角数字で出力
+    if (tel||fax) body += rXp(rXr('電　話　'+rH(tel)+'　ＦＡＸ　'+rH(fax)+'　'), {jc:'right'});
+    lawyers.forEach((l,i) => { body += rXp(rXr(rZ(l)), {jc:'right'}); if(i<lawyers.length-1) body+=rEp(); });
+    body += rEp();
+
+    // 拝啓・本文
+    body += rXp(rXr('拝啓　時下ますますご清栄のこととお慶び申し上げます。'));
+    body += rXp(rXr('　'+rZ(dayRefWord)+rZ(pt)+'から、ご依頼の'+rZ(cn)+'について、'+rZ(pn)+'期日が'+pty+'で実施されましたので、以下、概要をご報告します。'));
+    body += rEp();
+    body += rXp(rXr('記'), {jc:'center'});
+    body += rEp();
+
+    // １ 提出書類
+    body += rXp(rXr('１　提出書類'), {hang:true});
+    docsLines.forEach(line => { body += rXp(rXr('　　'+rZ(line)), {hang:true}); });
+    body += rEp();
+
+    // ２ 手続の概要
+    body += rXp(rXr('２　手続の概要'));
+    const procItemsW = rGetProcData();
+    if (procItemsW.length) {
+      procItemsW.forEach(r => {
+        if (r.level===0) {
+          r.text.split('\n').forEach((line,i) => {
+            if (i===0) body += rXp(rXr(rZ(line)), {procL0:true});
+            else       body += rXp(rXr(rZ(line)), {procCont:true});
+          });
+        } else if (r.level===1) {
+          r.text.split('\n').forEach((line,i) => {
+            if (i===0) body += rXp(rXr(rZ(r.badge)+'　'+rZ(line)), {procL1:true});
+            else       body += rXp(rXr(rZ(line)), {procCont:true});
+          });
+        } else {
+          r.text.split('\n').forEach((line,i) => {
+            if (i===0) body += rXp(rXr(rZ(r.badge)+'　'+rZ(line)), {procL2:true});
+            else       body += rXp(rXr(rZ(line)), {procL2cont:true});
+          });
+        }
+      });
+    } else { body += rXp(rXr(''), {procL0:true}); }
+    body += rEp();
+
+    // ３ 次回期日
+    body += rXp(rXr('３　次回期日'), {hang:true});
+    body += rXp(rXr('　　次回期日は、'+rZ(ndJp||'　年　月　日')+rZ(ndDow)+rZ(nt)+'から本日と同様に'+nty+'として実施される予定です。'), {hang:true});
+    body += rEp();
+
+    // ４ 当方の準備事項
+    body += rXp(rXr('４　当方の準備事項'), {hang:true});
+    const prepLines = prep ? prep.split('\n') : ['当方の準備事項はありません。'];
+    prepLines.forEach(line => { body += rXp(rXr('　　'+rZ(line)), {hang:true}); });
+    body += rEp();
+
+    body += rXp(rXr('以上、ご報告となります。引き続きよろしくお願い申し上げます。'));
+    body += rEp();
+    body += rXp(rXr('敬具'), {jc:'right'});
+    body += rEp();
+
+    // 送付書類
+    body += rXp(rXr('（送付書類）'));
+    sendDocs.forEach((d,i) => {
+      const kindStr = d.kind&&d.kind!=='写し' ? '（'+d.kind+'）' : '（写し）';
+      const prefix = '　'+sdN[i]+'　';
+      // 書類名・部数も全角化
+      const nameZen = rZ(d.name);
+      const kindZen = rZ(kindStr);
+      const cntZen  = rZ(d.cnt);
+      let padCount = TOTAL_WIDTH - prefix.length - d.name.length - kindStr.length - d.cnt.length;
+      if (padCount < 1) padCount = 1;
+      body += rXp(rXr(prefix+nameZen+kindZen+'　'.repeat(padCount)+cntZen));
+    });
+    if (sendDocs.length) body += rXp(rXr('以上'), {jc:'right'});
+
+    // DOCX組み立て
+    const docXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:wpc="http://schemas.microsoft.com/office/word/2010/wordprocessingCanvas"
+  xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"
+  xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:aink="http://schemas.microsoft.com/office/drawing/2016/ink"
+  xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+  xmlns:v="urn:schemas-microsoft-com:vml"
+  xmlns:wp14="http://schemas.microsoft.com/office/word/2010/wordprocessingDrawing"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:w10="urn:schemas-microsoft-com:office:word"
+  xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+  xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"
+  xmlns:w16cex="http://schemas.microsoft.com/office/word/2018/wordml/cex"
+  xmlns:w16se="http://schemas.microsoft.com/office/word/2015/wordml/symex"
+  xmlns:wpg="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup"
+  xmlns:wpi="http://schemas.microsoft.com/office/word/2010/wordprocessingInk"
+  xmlns:wne="http://schemas.microsoft.com/office/word/2006/wordml"
+  xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"
+  mc:Ignorable="w14 w15 w16se w16cex wp14">
+<w:body>
+${body}
+<w:sectPr>
+  <w:pgSz w:w="11906" w:h="16838"/>
+  <w:pgMar w:top="1418" w:right="1134" w:bottom="1418" w:left="1701" w:header="709" w:footer="709" w:gutter="0"/>
+</w:sectPr>
+</w:body>
+</w:document>`;
+
+    const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="ＭＳ 明朝" w:hAnsi="ＭＳ 明朝" w:eastAsia="ＭＳ 明朝" w:cs="ＭＳ 明朝"/>
+        <w:sz w:val="24"/><w:szCs w:val="24"/>
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault>
+      <w:pPr><w:spacing w:after="0" w:line="360" w:lineRule="auto"/></w:pPr>
+    </w:pPrDefault>
+  </w:docDefaults>
+</w:styles>`;
+
+    const appXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">
+  <Application>案件管理統合システム</Application>
+</Properties>`;
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+  <Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
+</Types>`;
+
+    const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+</Relationships>`;
+
+    const zip2 = new JSZip();
+    zip2.file('[Content_Types].xml', contentTypesXml);
+    zip2.file('_rels/.rels', rootRelsXml);
+    zip2.file('word/document.xml', docXml);
+    zip2.file('word/styles.xml', stylesXml);
+    zip2.file('word/_rels/document.xml.rels', relsXml);
+    zip2.file('docProps/app.xml', appXml);
+
+    const blob = await zip2.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeCase = (g('r_caseName')||'経過報告書').replace(/[\\/:*?"<>|]/g,'_').slice(0,20);
+    const safePeriod = (g('r_periodNum')||'').replace(/[\\/:*?"<>|]/g,'_');
+    const today2 = new Date().toISOString().slice(0,10).replace(/-/g,'');
+    a.href = url;
+    a.download = `経過報告書_${safeCase}${safePeriod?'_'+safePeriod:''}_${today2}.docx`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (sdot) sdot.className='sdot ok';
+    if (stxt) stxt.textContent='Wordファイルを生成しました';
+    showNotif('Wordファイルをダウンロードしました。','success');
+
+  } catch(e) {
+    console.error(e);
+    showNotif('Word生成に失敗しました。','error');
+    if (sdot) sdot.className='sdot ok';
+    if (stxt) stxt.textContent='入力内容がリアルタイムで反映されます';
+  } finally {
+    if (btn) { btn.innerHTML='📄 Wordファイルを生成'; btn.disabled=false; }
+  }
+}
+
+// ─── MODAL (case) ─────────────────────────────────────────────
+let modalTasks = [];
+let modalClients = [];
+
+function renderClientEditorList() {
+  const el = document.getElementById('clientEditorList'); if(!el) return;
+  el.innerHTML = modalClients.map((cl, i) => `
+    <div class="client-editor-item">
+      <input class="form-input client-kana-input" type="text" maxlength="1" placeholder="あ"
+        value="${esc(cl.kana||'')}" oninput="updateModalClient(${i},'kana',this.value)" title="よみ（ひらがな1文字）">
+      <input class="form-input" type="text" placeholder="依頼者名を入力"
+        value="${esc(cl.name||'')}" oninput="updateModalClient(${i},'name',this.value)">
+      ${modalClients.length > 1 ? `<button class="btn btn-danger btn-sm" onclick="removeClientEditorItem(${i})">削除</button>` : '<div style="width:44px"></div>'}
+    </div>`).join('');
+}
+function addClientEditorItem() { modalClients.push({ kana:'', name:'' }); renderClientEditorList(); }
+function removeClientEditorItem(i) { modalClients.splice(i, 1); renderClientEditorList(); }
+function updateModalClient(i, field, value) { if (modalClients[i]) modalClients[i][field] = value; }
+
+function renderTaskEditorList() {
+  const el = document.getElementById('taskEditorList'); if(!el) return;
+  if (!modalTasks.length) { el.innerHTML = ''; return; }
+  el.innerHTML = modalTasks.map((t, i) => `
+    <div class="task-editor-item" id="tei_${t.id}">
+      <div class="task-editor-item-header">
+        <span class="task-editor-num" style="font-size:0.72rem;color:var(--text-muted);font-weight:600;letter-spacing:0.08em;">タスク ${i+1}</span>
+        <button class="btn btn-danger btn-sm" onclick="removeTaskEditorItem('${t.id}')">削除</button>
+      </div>
+      <div class="task-editor-deadline-row">
+        <label>期限：</label>
+        <input class="form-input" type="date" style="max-width:200px;" value="${esc(t.deadline||'')}"
+          onchange="updateModalTask('${t.id}','deadline',this.value)">
+      </div>
+      <textarea class="form-textarea" rows="3" placeholder="タスクの内容を入力…"
+        onchange="updateModalTask('${t.id}','content',this.value)"
+        oninput="updateModalTask('${t.id}','content',this.value)">${esc(t.content||'')}</textarea>
+    </div>`).join('');
+}
+function addTaskEditorItem() {
+  modalTasks.push({ id:genId(), deadline:'', content:'', done:false, createdAt:new Date().toISOString() });
+  renderTaskEditorList();
+}
+function removeTaskEditorItem(id) { modalTasks = modalTasks.filter(t=>t.id!==id); renderTaskEditorList(); }
+function updateModalTask(id, field, value) { const t=modalTasks.find(x=>x.id===id); if(t) t[field]=value; }
+
+function openNewCaseModal() {
+  editingCaseId = null;
+  document.getElementById('modalTitle').textContent = '新規案件の作成';
+  ['fi_opponent','fi_caseName','fi_dateDate','fi_dateHour','fi_dateMin'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  setTimeout(()=>setTimePickerValues(null,null),0);
+  modalClients = [{ kana:'', name:'' }];
+  renderClientEditorList();
+  modalTasks = [];
+  renderTaskEditorList();
+  document.getElementById('caseModal').style.display = 'flex';
+}
+
+function openEditModal(id) {
+  editingCaseId = id;
+  const c = cases.find(x=>x.id===id); if(!c) return;
+  document.getElementById('modalTitle').textContent = '案件を編集';
+  document.getElementById('fi_opponent').value = c.opponent||'';
+  document.getElementById('fi_caseName').value = c.caseName||'';
+  document.getElementById('fi_dateDate').value = c.nextDate||'';
+  document.getElementById('fi_dateHour').value = (c.nextHour!==''&&c.nextHour!==undefined&&c.nextHour!==null)?c.nextHour:'';
+  document.getElementById('fi_dateMin').value = (c.nextMin!==''&&c.nextMin!==undefined&&c.nextMin!==null)?c.nextMin:'';
+  setTimeout(()=>setTimePickerValues(c.nextHour,c.nextMin),0);
+  modalClients = getClients(c).map(cl=>({...cl}));
+  if (!modalClients.length) modalClients = [{ kana:'', name:'' }];
+  renderClientEditorList();
+  modalTasks = getTasks(c).map(t=>({...t}));
+  renderTaskEditorList();
+  document.getElementById('caseModal').style.display = 'flex';
+}
+
+function openAddTaskModal(caseId) {
+  editingCaseId = caseId;
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  document.getElementById('modalTitle').textContent = 'タスクを追加 — ' + (c.caseName||'');
+  document.getElementById('fi_opponent').value = c.opponent||'';
+  document.getElementById('fi_caseName').value = c.caseName||'';
+  document.getElementById('fi_dateDate').value = c.nextDate||'';
+  document.getElementById('fi_dateHour').value = (c.nextHour!==''&&c.nextHour!==undefined&&c.nextHour!==null)?c.nextHour:'';
+  document.getElementById('fi_dateMin').value = (c.nextMin!==''&&c.nextMin!==undefined&&c.nextMin!==null)?c.nextMin:'';
+  setTimeout(()=>setTimePickerValues(c.nextHour,c.nextMin),0);
+  modalClients = getClients(c).map(cl=>({...cl}));
+  if (!modalClients.length) modalClients = [{ kana:'', name:'' }];
+  renderClientEditorList();
+  modalTasks = getTasks(c).map(t=>({...t}));
+  modalTasks.push({ id:genId(), deadline:'', content:'', done:false, createdAt:new Date().toISOString() });
+  renderTaskEditorList();
+  document.getElementById('caseModal').style.display = 'flex';
+}
+
+function openEditTaskModal(caseId, taskId) {
+  editingCaseId = caseId;
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  document.getElementById('modalTitle').textContent = 'タスクを編集 — ' + (c.caseName||'');
+  document.getElementById('fi_opponent').value = c.opponent||'';
+  document.getElementById('fi_caseName').value = c.caseName||'';
+  document.getElementById('fi_dateDate').value = c.nextDate||'';
+  document.getElementById('fi_dateHour').value = (c.nextHour!==''&&c.nextHour!==undefined&&c.nextHour!==null)?c.nextHour:'';
+  document.getElementById('fi_dateMin').value = (c.nextMin!==''&&c.nextMin!==undefined&&c.nextMin!==null)?c.nextMin:'';
+  setTimeout(()=>setTimePickerValues(c.nextHour,c.nextMin),0);
+  modalClients = getClients(c).map(cl=>({...cl}));
+  if (!modalClients.length) modalClients = [{ kana:'', name:'' }];
+  renderClientEditorList();
+  modalTasks = getTasks(c).map(t=>({...t}));
+  renderTaskEditorList();
+  document.getElementById('caseModal').style.display = 'flex';
+  setTimeout(()=>{ const el=document.getElementById('tei_'+taskId); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); },100);
+}
+
+function closeCaseModal() { document.getElementById('caseModal').style.display='none'; }
+
+function saveCase() {
+  const validClients = modalClients.map(cl=>({ kana:(cl.kana||'').trim(), name:(cl.name||'').trim() })).filter(cl=>cl.name);
+  if (!validClients.length) { showNotif('依頼者名を1件以上入力してください。','error'); return; }
+  const caseName = document.getElementById('fi_caseName').value.trim();
+  if (!caseName) { showNotif('事件名を入力してください。','error'); return; }
+  const hRaw = document.getElementById('fi_dateHour').value;
+  const mRaw = document.getElementById('fi_dateMin').value;
+  const h = hRaw!==''?parseInt(hRaw):'';
+  const m = mRaw!==''?parseInt(mRaw):'';
+  if (hRaw!==''&&(isNaN(h)||h<0||h>23)){showNotif('時は0〜23で入力してください。','error');return;}
+  if (mRaw!==''&&(isNaN(m)||m<0||m>59)){showNotif('分は0〜59で入力してください。','error');return;}
+  const data = {
+    clients: validClients, kana: validClients[0].kana, client: validClients[0].name,
+    opponent: document.getElementById('fi_opponent').value.trim(), caseName,
+    nextDate: document.getElementById('fi_dateDate').value,
+    nextHour: h, nextMin: m, tasks: modalTasks,
+    updatedAt: new Date().toISOString()
+  };
+  if (editingCaseId) {
+    const idx = cases.findIndex(x=>x.id===editingCaseId);
+    if (idx>=0) cases[idx] = { ...cases[idx], ...data };
+    currentCaseId = editingCaseId; currentView = 'detail';
+  } else {
+    const nc = { id:genId(), createdAt:new Date().toISOString(), reports:[], ...data };
+    cases.push(nc); currentCaseId = nc.id; currentView = 'detail';
+  }
+  save(); closeCaseModal(); renderSidebar(); renderContent();
+  showNotif(editingCaseId?'案件を更新しました。':'新規案件を作成しました。','success');
+  if (gAccessToken) syncToDrive(false);
+}
+
+// ─── DELETE ───────────────────────────────────────────────────
+function openConfirmDelete(id) {
+  deletingCaseId = id;
+  const c = cases.find(x=>x.id===id);
+  document.getElementById('confirmCaseName').textContent = (c ? allClientNames(c) : '')+'（'+(c?.caseName||'')+'）';
+  document.getElementById('confirmModal').style.display = 'flex';
+}
+function closeConfirm() { document.getElementById('confirmModal').style.display='none'; }
+function confirmDelete() {
+  cases = cases.filter(x=>x.id!==deletingCaseId);
+  if (currentCaseId===deletingCaseId) currentCaseId=null;
+  deletingCaseId=null;
+  save(); closeConfirm(); renderSidebar(); renderContent();
+  showNotif('案件を削除しました。','success');
+  if (gAccessToken) syncToDrive(false);
+}
+
+// ─── LIST VIEW ────────────────────────────────────────────────
+function showListView() { currentView='list'; currentCaseId=null; renderSidebar(); renderListView(); }
+function renderListView() {
+  const area = document.getElementById('contentArea');
+  const list = listSortMode==='alpha' ? sortAlpha(cases) : listSortMode==='nextdate' ? sortNextDate(cases) : sortDeadline(cases);
+  area.innerHTML = `
+    <div class="tabs"><div class="tab active">📋 一覧表示</div></div>
+    <div class="list-view">
+      <div class="list-controls">
+        <span class="list-controls-title">全案件一覧</span>
+        <button class="sort-btn${listSortMode==='alpha'?' active':''}" onclick="setSort('alpha')">あいうえお順</button>
+        <button class="sort-btn${listSortMode==='nextdate'?' active':''}" onclick="setSort('nextdate')">次回期日順</button>
+        <button class="sort-btn${listSortMode==='deadline'?' active':''}" onclick="setSort('deadline')">期限順</button>
+        <span style="margin-left:auto;font-size:0.78rem;color:var(--text-muted);">計 ${cases.length} 件</span>
+      </div>
+      ${list.length===0 ? `<div class="no-cases-state"><div style="font-size:2.5rem;opacity:0.3">📋</div><div style="font-size:0.9rem;opacity:0.5">案件がありません。</div></div>` : `
+      <table class="list-table">
+        <thead><tr>
+          <th style="width:20%">事件名</th><th style="width:13%">依頼者</th><th style="width:13%">相手方</th>
+          <th style="width:16%">次回期日</th><th style="width:12%">直近期限</th>
+          <th style="width:8%">タスク</th><th style="width:8%">報告書</th><th>タスク内容（直近）</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(c => {
+            const nd = nearestDeadline(c); const st = deadlineStatus(nd); const bd = deadlineBadgeText(nd);
+            const activeTasks = getActiveTasks(c);
+            const nextTask = activeTasks.filter(t=>t.deadline).sort((a,b)=>a.deadline>b.deadline?1:-1)[0] || activeTasks[0];
+            const preview = nextTask ? (nextTask.content||'').replace(/\n/g,' ').slice(0,40)+((nextTask.content||'').length>40?'…':'') : '—';
+            const isClosed = !!c.closed;
+            const reportCnt = getReports(c).length;
+            return `<tr onclick="selectCase('${c.id}')" class="${isClosed?'row-closed':''}">
+              <td><div class="table-case-name">${esc(c.caseName||'—')}${isClosed?' <span style="font-size:0.68rem;background:#5a5a6e;color:#fff;padding:1px 5px;border-radius:2px;margin-left:4px;">終了</span>':''}</div></td>
+              <td class="table-parties">${getClients(c).map(cl=>(cl.kana?`<span style="font-size:0.68rem;background:rgba(200,150,60,0.15);color:var(--accent-gold);padding:1px 4px;border-radius:2px;margin-right:2px">${esc(cl.kana)}</span>`:'')+esc(cl.name||'')).join('<br>')}</td>
+              <td class="table-parties">${esc(c.opponent||'—')}</td>
+              <td class="table-date">${esc(formatNextDate(c))}</td>
+              <td class="table-deadline ${st}">${nd||'—'}${bd?`<br><small>${bd}</small>`:''}</td>
+              <td style="font-size:0.8rem;text-align:center;color:var(--text-muted);">${getActiveTasks(c).length}/${getTasks(c).length}</td>
+              <td style="font-size:0.8rem;text-align:center;color:var(--text-muted);">${reportCnt}</td>
+              <td style="font-size:0.8rem;color:var(--text-muted)">${esc(preview)}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`}
+    </div>`;
+}
+function setSort(mode) { listSortMode=mode; renderListView(); }
+
+// ─── TASK LIST VIEW ───────────────────────────────────────────
+function showTaskListView() { currentView='tasklist'; currentCaseId=null; renderSidebar(); renderTaskListView(); }
+function renderTaskListView() {
+  const area = document.getElementById('contentArea');
+  let rows = [];
+  cases.forEach(c => {
+    if (c.closed && taskListFilter==='active') return;
+    getTasks(c).forEach(t => {
+      if (taskListFilter==='active' && t.done) return;
+      rows.push({ task:t, case:c });
+    });
+  });
+  rows.sort((a,b)=>{ const da=a.task.deadline,db=b.task.deadline; if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1; return new Date(da)-new Date(db); });
+  const total=rows.length;
+  const overdueCount=rows.filter(r=>r.task.deadline&&deadlineStatus(r.task.deadline)==='overdue').length;
+  const soonCount=rows.filter(r=>r.task.deadline&&deadlineStatus(r.task.deadline)==='soon').length;
+  const grouped=[];let lastSection=null;
+  rows.forEach(r=>{
+    const dl=r.task.deadline;
+    let section=!dl?'__none__':(deadlineStatus(dl)==='overdue'?'__overdue__':dl);
+    if(section!==lastSection){grouped.push({section,rows:[]});lastSection=section;}
+    grouped[grouped.length-1].rows.push(r);
+  });
+  function sectionLabel(s){if(s==='__overdue__')return'⚠ 期限超過';if(s==='__none__')return'— 期限なし';const d=new Date(s);const week=['日','月','火','水','木','金','土'];return `${s}（${week[d.getDay()]}）`;}
+  function sectionClass(s){if(s==='__overdue__')return'color:var(--accent);background:rgba(139,26,26,0.07);';if(s==='__none__')return'color:var(--text-muted);';const st=deadlineStatus(s);if(st==='soon')return'color:#c75000;background:rgba(199,80,0,0.05);';return'';}
+  const tableBody=grouped.map(g=>{
+    const headerRow=`<tr><td colspan="5" class="tl-section-header" style="${sectionClass(g.section)}">${sectionLabel(g.section)}</td></tr>`;
+    const taskRows=g.rows.map(r=>{
+      const{task:t,case:c}=r;const st=t.deadline?deadlineStatus(t.deadline):'none';const bd=t.deadline?deadlineBadgeText(t.deadline):null;
+      const contentPreview=(t.content||'（内容なし）').replace(/\n/g,' ');
+      const clientDisplay=allClientNames(c);const kana=primaryKana(c);
+      return `<tr class="${t.done?'tl-done':''}" onclick="selectCase('${c.id}')">
+        <td onclick="event.stopPropagation()"><input type="checkbox" class="tl-check" ${t.done?'checked':''} onchange="toggleTaskDone('${c.id}','${t.id}',this.checked)"></td>
+        <td class="tl-deadline-cell ${st}">${t.deadline?esc(t.deadline):'—'}${bd&&!t.done?`<span class="tl-badge ${st}">${bd}</span>`:''}</td>
+        <td><div class="tl-content">${esc(contentPreview)}</div></td>
+        <td><div style="font-size:0.82rem;font-weight:600;color:var(--ink);">${kana?`<span style="font-size:0.68rem;background:rgba(200,150,60,0.15);color:var(--accent-gold);padding:1px 4px;border-radius:2px;margin-right:3px">${esc(kana)}</span>`:''} ${esc(clientDisplay)}</div>
+          <div class="tl-casename">${esc(c.caseName||'—')}${c.closed?'　<span style="font-size:0.68rem;background:#5a5a6e;color:#fff;padding:1px 4px;border-radius:2px;">終了</span>':''}</div></td>
+        <td style="text-align:center;"><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditTaskModal('${c.id}','${t.id}')">編集</button></td>
+      </tr>`;
+    }).join('');
+    return headerRow+taskRows;
+  }).join('');
+  area.innerHTML=`
+    <div class="tabs"><div class="tab active">⏰ 期限順タスク一覧</div></div>
+    <div class="task-list-view">
+      <div class="tl-filter-row">
+        <span class="list-controls-title">期限順タスク一覧</span>
+        <button class="sort-btn${taskListFilter==='active'?' active':''}" onclick="setTaskListFilter('active')">未完了のみ</button>
+        <button class="sort-btn${taskListFilter==='all'?' active':''}" onclick="setTaskListFilter('all')">すべて表示</button>
+        <span style="margin-left:auto;font-size:0.78rem;color:var(--text-muted);">
+          ${overdueCount>0?`<span style="color:var(--accent);font-weight:600;margin-right:10px;">⚠ 超過 ${overdueCount}件</span>`:''}
+          ${soonCount>0?`<span style="color:#c75000;font-weight:600;margin-right:10px;">⏰ 間近 ${soonCount}件</span>`:''}
+          計 ${total} タスク
+        </span>
+      </div>
+      ${rows.length===0?`<div class="no-cases-state"><div style="font-size:2.5rem;opacity:0.3">✅</div><div style="font-size:0.9rem;opacity:0.5">表示するタスクがありません。</div></div>`:`
+      <table class="task-list-table">
+        <thead><tr><th style="width:36px;"></th><th style="width:14%">期限</th><th>タスク内容</th><th style="width:22%">依頼者 / 事件名</th><th style="width:60px;"></th></tr></thead>
+        <tbody>${tableBody}</tbody>
+      </table>`}
+    </div>`;
+}
+function setTaskListFilter(f) { taskListFilter=f; renderTaskListView(); }
+
+// ─── NOTIFICATION ─────────────────────────────────────────────
+function showNotif(msg, type='success') {
+  const n=document.createElement('div');
+  n.className='notification '+type;
+  n.innerHTML=(type==='success'?'✓':type==='info'?'ℹ':'⚠')+' '+msg;
+  document.body.appendChild(n);
+  setTimeout(()=>{n.style.opacity='0';n.style.transition='opacity 0.4s';setTimeout(()=>n.remove(),400);},2800);
+}
+
+// ─── JSON EXPORT ─────────────────────────────────────────────
+function exportToJSON() {
+  if (cases.length===0) { showNotif('エクスポートする案件がありません。','error'); return; }
+  const data = JSON.stringify({ cases, exportedAt:new Date().toISOString() }, null, 2);
+  const blob = new Blob([data], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0,10).replace(/-/g,'');
+  a.href=url; a.download=`案件データ_${today}.json`;
+  a.click(); URL.revokeObjectURL(url);
+  showNotif('JSONファイルをダウンロードしました。','success');
+}
+
+// ─── EXCEL EXPORT ────────────────────────────────────────────
+function exportToExcel() {
+  if (cases.length===0) { showNotif('エクスポートする案件がありません。','error'); return; }
+  const list = sortAlpha(cases);
+  const rows = [];
+  list.forEach(c => {
+    const tasks = getTasks(c);
+    const clientStr = getClients(c).map(cl=>(cl.kana?`[${cl.kana}] `:'')+cl.name).join('・');
+    if (tasks.length===0) {
+      rows.push({'事件名':c.caseName||'','依頼者':clientStr,'相手方':c.opponent||'','次回期日':formatNextDate(c)==='—'?'':formatNextDate(c),'タスク期限':'','タスク内容':'','完了':''});
+    } else {
+      tasks.forEach((t,i)=>rows.push({
+        '事件名':i===0?(c.caseName||''):'','依頼者':i===0?clientStr:'','相手方':i===0?(c.opponent||''):'',
+        '次回期日':i===0?(formatNextDate(c)==='—'?'':formatNextDate(c)):'',
+        'タスク期限':t.deadline||'','タスク内容':t.content||'','完了':t.done?'✓':''
+      }));
+    }
+  });
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=[{wch:28},{wch:18},{wch:16},{wch:22},{wch:14},{wch:50},{wch:6}];
+  XLSX.utils.book_append_sheet(wb,ws,'案件一覧');
+  const today=new Date().toISOString().slice(0,10).replace(/-/g,'');
+  XLSX.writeFile(wb,`案件一覧_${today}.xlsx`);
+  showNotif('Excelファイルをダウンロードしました。','success');
+}
+
+// ─── MERGE IMPORT (タスク管理JSON + 経過報告書JSON) ────────────
+let _mergeImportFile = null;
+let _mergeImportData = null;
+
+function openMergeImportModal(event) {
+  const file = event.target.files[0]; if (!file) return;
+  _mergeImportFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      _mergeImportData = data;
+      const modal = document.getElementById('mergeImportModal');
+      const desc = document.getElementById('mergeImportDesc');
+      const actions = document.getElementById('mergeImportActions');
+
+      // Detect file type
+      const hasCases = !!(data.cases || Array.isArray(data));
+      const hasArchive = !!(data.archive && Array.isArray(data.archive));
+
+      if (hasCases && !hasArchive) {
+        // Task manager JSON
+        const imported = data.cases || data;
+        desc.innerHTML = `<strong>案件データJSON</strong>を検出しました。<br>${imported.length} 件の案件データを読み込みます。`;
+        actions.innerHTML = `
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.83rem;">
+            <input type="radio" name="mergeMode" value="overwrite" checked> 現在のデータを上書き
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.83rem;">
+            <input type="radio" name="mergeMode" value="merge"> 現在のデータにマージ（ID重複時は読み込み側を優先）
+          </label>`;
+      } else if (hasArchive) {
+        // Report JSON
+        desc.innerHTML = `<strong>経過報告書JSON</strong>を検出しました。<br>${data.archive.length} 件の報告書データを案件に紐づけます。<br><small style="color:var(--text-muted);">事件名で自動マッチング。マッチしない場合は新規案件を作成します。</small>`;
+        actions.innerHTML = '';
+      } else {
+        desc.innerHTML = '有効なデータが見つかりませんでした。';
+        actions.innerHTML = '';
+        document.getElementById('mergeImportBtn').disabled = true;
+      }
+      modal.style.display = 'flex';
+      event.target.value = '';
+    } catch(err) { showNotif('JSONファイルの読み込みに失敗しました。','error'); event.target.value=''; }
+  };
+  reader.readAsText(file);
+}
+function closeMergeImportModal() { document.getElementById('mergeImportModal').style.display='none'; _mergeImportData=null; _mergeImportFile=null; }
+
+function doMergeImport() {
+  if (!_mergeImportData) return;
+  const data = _mergeImportData;
+
+  const hasCases = !!(data.cases || Array.isArray(data));
+  const hasArchive = !!(data.archive && Array.isArray(data.archive));
+
+  if (hasCases && !hasArchive) {
+    // Task manager JSON
+    const imported = (data.cases || data).map(c => migrateCaseToMultiTask(c));
+    const modeEl = document.querySelector('input[name="mergeMode"]:checked');
+    const mode = modeEl ? modeEl.value : 'overwrite';
+    if (mode === 'overwrite') {
+      cases = imported;
+    } else {
+      // Merge: タスク管理側優先
+      imported.forEach(inc => {
+        const idx = cases.findIndex(x=>x.id===inc.id);
+        if (idx>=0) cases[idx] = { ...cases[idx], ...inc, reports: cases[idx].reports || [] };
+        else cases.push(inc);
+      });
+    }
+    save(); renderSidebar(); renderContent();
+    showNotif(`${imported.length} 件の案件データを読み込みました。`,'success');
+  } else if (hasArchive) {
+    // Report JSON → 案件名でマッチング
+    mergeReportArchive(data.archive);
+  }
+  closeMergeImportModal();
+  if (gAccessToken) syncToDrive(false);
+}
+
+function mergeReportArchive(archive) {
+  let matched = 0, created = 0, added = 0;
+  archive.forEach(rec => {
+    if (!rec || !rec.data) return;
+    const caseName = rec.data.caseName || rec.caseName || '';
+    // Find matching case (by caseName, task-manager side priority)
+    let c = cases.find(x => (x.caseName||'').trim() === caseName.trim() && caseName.trim() !== '');
+    if (!c) {
+      // Create new case stub
+      c = { id:genId(), createdAt:new Date().toISOString(), reports:[], tasks:[],
+        clients:[{ kana:'', name: (rec.clientNames||[])[0]||'' }],
+        client:(rec.clientNames||[])[0]||'',kana:'',opponent:'',caseName,nextDate:'',nextHour:'',nextMin:'' };
+      cases.push(c); created++;
+    }
+    if (!c.reports) c.reports = [];
+    const existingIdx = c.reports.findIndex(x=>x.id===rec.id);
+    if (existingIdx>=0) c.reports[existingIdx]=rec; else { c.reports.push(rec); added++; }
+    matched++;
+  });
+  save(); renderSidebar(); renderContent();
+  showNotif(`報告書 ${added} 件を追加しました。（新規案件 ${created} 件作成）`,'success');
+}
+
+// ─── TASK TP (time picker for case modal) ────────────────────
+let tpHour = null, tpMin = null;
+function tpSetHour(v) {
+  tpHour=v;const inp=document.getElementById('tpHourInput');if(!inp)return;
+  if(v===null){inp.value='';inp.placeholder='−−';inp.classList.add('empty');}
+  else{inp.value=String(v).padStart(2,'0');inp.classList.remove('empty');}
+  document.getElementById('fi_dateHour').value=v!==null?v:'';
+}
+function tpSetMin(v) {
+  tpMin=v;const inp=document.getElementById('tpMinInput');if(!inp)return;
+  if(v===null){inp.value='';inp.placeholder='−−';inp.classList.add('empty');}
+  else{inp.value=String(v).padStart(2,'0');inp.classList.remove('empty');}
+  document.getElementById('fi_dateMin').value=v!==null?v:'';
+}
+function tpStep(type,dir) {
+  if(type==='h'){const cur=tpHour!==null?tpHour:(dir>0?-1:0);tpSetHour(((cur+dir)%24+24)%24);if(tpMin===null)tpSetMin(0);}
+  else{const cur=tpMin!==null?tpMin:(dir>0?-1:0);tpSetMin(((cur+dir)%60+60)%60);if(tpHour===null)tpSetHour(0);}
+}
+function setTimePickerValues(h,m) {
+  const hv=(h!==''&&h!==null&&h!==undefined)?parseInt(h):null;
+  const mv=(m!==''&&m!==null&&m!==undefined)?parseInt(m):null;
+  tpSetHour(!isNaN(hv)&&hv!==null?hv:null);tpSetMin(!isNaN(mv)&&mv!==null?mv:null);
+}
+function clearTimePicker(){tpSetHour(null);tpSetMin(null);}
+function initTimePickers() {
+  tpSetHour(tpHour);tpSetMin(tpMin);
+  function setupBtn(btnId,type,dir){
+    const btn=document.getElementById(btnId);if(!btn)return;
+    let timer=null,interval=null;
+    function press(){tpStep(type,dir);timer=setTimeout(()=>{interval=setInterval(()=>tpStep(type,dir),80);},400);}
+    function release(){clearTimeout(timer);clearInterval(interval);}
+    btn.addEventListener('mousedown',e=>{e.preventDefault();press();});
+    btn.addEventListener('touchstart',e=>{e.preventDefault();press();},{passive:false});
+    window.addEventListener('mouseup',release);window.addEventListener('touchend',release);
+  }
+  setupBtn('tpHourUp','h',+1);setupBtn('tpHourDown','h',-1);setupBtn('tpMinUp','m',+1);setupBtn('tpMinDown','m',-1);
+  function setupInput(inputId,type,max){
+    const inp=document.getElementById(inputId);if(!inp)return;
+    inp.addEventListener('focus',()=>inp.select());
+    inp.addEventListener('input',()=>{
+      const raw=inp.value.replace(/[^0-9]/g,'');inp.value=raw;
+      if(raw===''){if(type==='h'){tpHour=null;document.getElementById('fi_dateHour').value='';}else{tpMin=null;document.getElementById('fi_dateMin').value='';}inp.classList.add('empty');return;}
+      const n=parseInt(raw,10);
+      if(!isNaN(n)&&n>=0&&n<=max){inp.classList.remove('empty');if(type==='h'){tpHour=n;document.getElementById('fi_dateHour').value=n;if(tpMin===null)tpSetMin(0);}else{tpMin=n;document.getElementById('fi_dateMin').value=n;if(tpHour===null)tpSetHour(0);}if(raw.length===2)inp.value=String(n).padStart(2,'0');}
+    });
+    inp.addEventListener('blur',()=>{const raw=inp.value.replace(/[^0-9]/g,'');if(raw===''){clearTimePicker();return;}let n=parseInt(raw,10);if(isNaN(n)||n<0||n>max)n=max;if(type==='h')tpSetHour(n);else tpSetMin(n);});
+    inp.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){e.preventDefault();tpStep(type,+1);}if(e.key==='ArrowDown'){e.preventDefault();tpStep(type,-1);}});
+    inp.addEventListener('wheel',e=>{e.preventDefault();tpStep(type,e.deltaY<0?+1:-1);},{passive:false});
+  }
+  setupInput('tpHourInput','h',23);setupInput('tpMinInput','m',59);
+}
+
+// ─── KEYBOARD ─────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') {
+    closeCaseModal(); closeConfirm(); closeDriveModal(); closeMergeImportModal();
+    closeReportImportModal();
+  }
+});
+
+// ─── REPORT IMPORT MODAL (report app archive JSON) ───────────
+// (Also accessible from merge import modal for report JSONs)
+let _pendingReportImport = null;
+function openReportImportModal() { document.getElementById('reportImportModal').classList.add('show'); }
+function closeReportImportModal(e) {
+  if (e && e.target!==document.getElementById('reportImportModal')) return;
+  document.getElementById('reportImportModal').classList.remove('show');
+  _pendingReportImport = null;
+  document.getElementById('reportImportStatus').className='import-status';
+  document.getElementById('reportImportStatus').textContent='';
+  document.getElementById('btnReportImportGo').disabled=true;
+}
+function handleReportFileSelect(e) { if(e.target.files[0]) processReportFile(e.target.files[0]); }
+function handleReportFileDrop(e) {
+  e.preventDefault(); document.getElementById('reportDropZone').classList.remove('over');
+  if(e.dataTransfer.files[0]) processReportFile(e.dataTransfer.files[0]);
+}
+function processReportFile(file) {
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try {
+      const data=JSON.parse(e.target.result);
+      const archive=data.archive||data;
+      if(!Array.isArray(archive)){throw new Error('invalid');}
+      _pendingReportImport=archive;
+      const st=document.getElementById('reportImportStatus');
+      st.className='import-status ok';st.textContent=`✓ ${archive.length} 件の報告書を検出しました。`;
+      document.getElementById('btnReportImportGo').disabled=false;
+    }catch(err){
+      const st=document.getElementById('reportImportStatus');
+      st.className='import-status err';st.textContent='エラー：有効な報告書データが見つかりませんでした。';
+      document.getElementById('btnReportImportGo').disabled=true;
+    }
+  };
+  reader.readAsText(file);
+}
+function doReportImport() {
+  if(!_pendingReportImport) return;
+  mergeReportArchive(_pendingReportImport);
+  closeReportImportModal();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────
+load();
+renderSidebar();
+renderContent();
+updateDriveStatusUI();
+initTimePickers();
+</script>
+</body>
+</html>
